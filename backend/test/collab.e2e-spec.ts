@@ -8,7 +8,7 @@ describe('Collab gateway (e2e)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [CollabModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ bufferLogs: true });
     await app.init();
   });
 

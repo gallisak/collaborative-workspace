@@ -1,6 +1,9 @@
 import { validateEnv } from './env.schema.js';
 
-const validEnv = { DATABASE_URL: 'postgresql://collab:collab@localhost:5432/collab_docs' };
+const validEnv = {
+  DATABASE_URL: 'postgresql://collab:collab@localhost:5432/collab_docs',
+  REDIS_URL: 'redis://localhost:6380',
+};
 
 describe('validateEnv', () => {
   it('applies defaults and coerces numbers', () => {
@@ -12,8 +15,8 @@ describe('validateEnv', () => {
   });
 
   it('lists every invalid variable', () => {
-    expect(() => validateEnv({ API_PORT: 'nope', NODE_ENV: 'staging' })).toThrow(
-      /NODE_ENV[\s\S]*API_PORT[\s\S]*DATABASE_URL/,
+    expect(() => validateEnv({ ...validEnv, DATABASE_URL: 'nope', REDIS_URL: 'nope' })).toThrow(
+      /DATABASE_URL[\s\S]*REDIS_URL/,
     );
   });
 });

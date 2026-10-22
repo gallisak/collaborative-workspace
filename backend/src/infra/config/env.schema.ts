@@ -5,9 +5,16 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().positive().default(4000),
   COLLAB_PORT: z.coerce.number().int().positive().default(4001),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  LOG_PRETTY: z.stringbool().default(false),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
+  LOGIN_EMAIL_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(5),
+  LOGIN_IP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
 
   DATABASE_URL: z.url(),
+  REDIS_URL: z.url(),
 });
 
 export type Env = z.infer<typeof envSchema>;

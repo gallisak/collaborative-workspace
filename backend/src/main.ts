@@ -4,7 +4,7 @@ import { AppModule } from './app.module.js';
 import { setupApp } from './setup-app.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const config = setupApp(app);
   await app.listen(config.get('API_PORT', { infer: true }));
 }

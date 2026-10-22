@@ -1,28 +1,34 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module.js';
-import { setupApp } from '../src/setup-app.js';
+import { createTestApp } from './helpers.js';
 
 describe('App (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    setupApp(app);
-    await app.init();
+    ({ app } = await createTestApp());
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  it('GET /health is served outside the /api prefix', async () => {
+  it('GET /health is public and served outside the /api prefix', async () => {
     await request(app.getHttpServer()).get('/health').expect(200, { status: 'ok' });
   });
 
-  it('unknown routes under /api return 404', async () => {
-    await request(app.getHttpServer()).get('/api/nope').expect(404);
+  it('returns errors in a single shape with a correlation id', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/nope')
+      .set('x-correlation-id', 'e2e-correlation-1')
+      .expect(404);
+
+    expect(res.headers['x-correlation-id']).toBe('e2e-correlation-1');
+    expect(res.body).toMatchObject({
+      statusCode: 404,
+      error: 'NOT_FOUND',
+      correlationId: 'e2e-correlation-1',
+      path: '/api/nope',
+    });
   });
 });
