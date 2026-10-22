@@ -17,18 +17,22 @@ describe('App (e2e)', () => {
     await request(app.getHttpServer()).get('/health').expect(200, { status: 'ok' });
   });
 
+  it('protects routes by default', async () => {
+    await request(app.getHttpServer()).get('/api/auth/me').expect(401);
+  });
+
   it('returns errors in a single shape with a correlation id', async () => {
     const res = await request(app.getHttpServer())
-      .get('/api/nope')
+      .get('/api/auth/me')
       .set('x-correlation-id', 'e2e-correlation-1')
-      .expect(404);
+      .expect(401);
 
     expect(res.headers['x-correlation-id']).toBe('e2e-correlation-1');
     expect(res.body).toMatchObject({
-      statusCode: 404,
-      error: 'NOT_FOUND',
+      statusCode: 401,
+      error: 'UNAUTHORIZED',
       correlationId: 'e2e-correlation-1',
-      path: '/api/nope',
+      path: '/api/auth/me',
     });
   });
 });

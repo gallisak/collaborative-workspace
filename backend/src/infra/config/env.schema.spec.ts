@@ -3,6 +3,8 @@ import { validateEnv } from './env.schema.js';
 const validEnv = {
   DATABASE_URL: 'postgresql://collab:collab@localhost:5432/collab_docs',
   REDIS_URL: 'redis://localhost:6380',
+  JWT_ACCESS_SECRET: 'a'.repeat(16),
+  REFRESH_TOKEN_SECRET: 'b'.repeat(16),
 };
 
 describe('validateEnv', () => {
@@ -12,11 +14,44 @@ describe('validateEnv', () => {
     expect(env.API_PORT).toBe(4100);
     expect(env.COLLAB_PORT).toBe(4001);
     expect(env.NODE_ENV).toBe('development');
+    expect(env.JWT_ACCESS_TTL).toBe('15m');
   });
 
   it('lists every invalid variable', () => {
-    expect(() => validateEnv({ ...validEnv, DATABASE_URL: 'nope', REDIS_URL: 'nope' })).toThrow(
-      /DATABASE_URL[\s\S]*REDIS_URL/,
+    expect(() =>
+      validateEnv({ ...validEnv, DATABASE_URL: 'nope', JWT_ACCESS_SECRET: 'short' }),
+    ).toThrow(/DATABASE_URL[\s\S]*JWT_ACCESS_SECRET/);
+  });
+
+  it('rejects malformed durations', () => {
+    expect(() => validateEnv({ ...validEnv, REFRESH_TOKEN_TTL: 'forever' })).toThrow(
+      /REFRESH_TOKEN_TTL/,
     );
+  });
+});
+
+describe('validateEnv in production', () => {
+  const strong = (char: string) => char.repeat(40);
+
+  it('rejects placeholder and short secrets', () => {
+    expect(() =>
+      validateEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        JWT_ACCESS_SECRET: 'dev-access-secret-change-me-please-now',
+        REFRESH_TOKEN_SECRET: 'too-short-secret',
+      }),
+    ).toThrow(/JWT_ACCESS_SECRET[\s\S]*REFRESH_TOKEN_SECRET/);
+  });
+
+  it('accepts strong secrets', () => {
+    const env = validateEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      JWT_ACCESS_SECRET: strong('x'),
+      REFRESH_TOKEN_SECRET: strong('y'),
+    });
+
+    expect(env.NODE_ENV).toBe('production');
   });
 });
