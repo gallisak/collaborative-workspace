@@ -11,6 +11,7 @@ CLAUDE.md
 .env
 .env.*
 !.env.example
+!.env.test.example
 !.env.staging.example
 
 .DS_Store
@@ -19,3 +20,5 @@ CLAUDE.md
 !.vscode/extensions.json
 
 *.log
+
+backend/src/generated/

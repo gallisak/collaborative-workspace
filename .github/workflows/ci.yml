@@ -29,6 +29,20 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: collab
+          POSTGRES_PASSWORD: collab
+          POSTGRES_DB: collab_docs_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U collab -d collab_docs_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,6 +51,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - name: Prepare test environment
+        run: cp ../.env.test.example ../.env.test
       - name: Lint
         run: npm run lint
       - name: Check formatting

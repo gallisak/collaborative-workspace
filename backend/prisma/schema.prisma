@@ -1,0 +1,422 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  previewFeatures     = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum AccessLevel {
+  VIEW
+  EDIT
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  TEAM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum CheckoutSessionStatus {
+  OPEN
+  COMPLETED
+  EXPIRED
+}
+
+enum VersionKind {
+  AUTO
+  MANUAL
+}
+
+enum AttachmentStatus {
+  PENDING
+  UPLOADED
+}
+
+enum NotificationType {
+  MENTION
+}
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique @db.Citext
+  name         String
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  refreshTokens       RefreshToken[]
+  memberships         WorkspaceMember[]
+  sentInvitations     Invitation[]
+  createdDocuments    Document[]
+  documentPermissions DocumentPermission[] @relation("grantee")
+  grantedPermissions  DocumentPermission[] @relation("grantor")
+  createdShareLinks   ShareLink[]
+  createdVersions     DocumentVersion[]
+  createdThreads      CommentThread[]      @relation("threadAuthor")
+  resolvedThreads     CommentThread[]      @relation("threadResolver")
+  comments            Comment[]
+  mentions            CommentMention[]
+  notifications       Notification[]       @relation("recipient")
+  causedNotifications Notification[]       @relation("actor")
+  checkoutSessions    CheckoutSession[]
+  uploadedAttachments Attachment[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  familyId  String    @map("family_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  rotatedAt DateTime? @map("rotated_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model Plan {
+  id              PlanTier @id
+  name            String
+  priceMinor      Int      @map("price_minor")
+  maxMembers      Int?     @map("max_members")
+  maxDocuments    Int?     @map("max_documents")
+  maxStorageBytes BigInt?  @map("max_storage_bytes")
+
+  workspaces       Workspace[]
+  subscriptions    Subscription[]
+  checkoutSessions CheckoutSession[]
+
+  @@map("plans")
+}
+
+model Workspace {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  planId    PlanTier @default(FREE) @map("plan_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  plan             Plan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  members          WorkspaceMember[]
+  invitations      Invitation[]
+  documents        Document[]
+  subscription     Subscription?
+  checkoutSessions CheckoutSession[]
+  attachments      Attachment[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  workspaceId String        @map("workspace_id") @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@unique([workspaceId], where: raw("role = 'OWNER'"), map: "workspace_members_one_owner_key")
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+model Invitation {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  email       String        @db.Citext
+  role        WorkspaceRole
+  tokenHash   String        @unique @map("token_hash")
+  invitedById String?       @map("invited_by_id") @db.Uuid
+  expiresAt   DateTime      @map("expires_at") @db.Timestamptz(3)
+  acceptedAt  DateTime?     @map("accepted_at") @db.Timestamptz(3)
+  revokedAt   DateTime?     @map("revoked_at") @db.Timestamptz(3)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User?     @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, email], where: raw("accepted_at IS NULL AND revoked_at IS NULL"), map: "invitations_pending_key")
+  @@map("invitations")
+}
+
+model Document {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  parentId    String?   @map("parent_id") @db.Uuid
+  title       String    @default("")
+  position    String
+  createdById String?   @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent        Document?            @relation("tree", fields: [parentId], references: [id], onDelete: Cascade)
+  children      Document[]           @relation("tree")
+  createdBy     User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  permissions   DocumentPermission[]
+  shareLinks    ShareLink[]
+  state         DocumentState?
+  updates       DocumentUpdate[]
+  versions      DocumentVersion[]
+  search        DocumentSearch?
+  threads       CommentThread[]
+  attachments   Attachment[]
+  notifications Notification[]
+
+  @@unique([parentId, position], where: raw("parent_id IS NOT NULL AND deleted_at IS NULL"), map: "documents_sibling_position_key")
+  @@unique([workspaceId, position], where: raw("parent_id IS NULL AND deleted_at IS NULL"), map: "documents_root_position_key")
+  @@index([workspaceId], where: raw("deleted_at IS NULL"), map: "documents_workspace_active_idx")
+  @@index([parentId])
+  @@map("documents")
+}
+
+model DocumentPermission {
+  documentId  String      @map("document_id") @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  accessLevel AccessLevel @map("access_level")
+  grantedById String?     @map("granted_by_id") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user      User     @relation("grantee", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User?    @relation("grantor", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@id([documentId, userId])
+  @@index([userId])
+  @@map("document_permissions")
+}
+
+model ShareLink {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  documentId  String      @map("document_id") @db.Uuid
+  token       String      @unique
+  accessLevel AccessLevel @map("access_level")
+  expiresAt   DateTime?   @map("expires_at") @db.Timestamptz(3)
+  revokedAt   DateTime?   @map("revoked_at") @db.Timestamptz(3)
+  createdById String?     @map("created_by_id") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@map("share_links")
+}
+
+model DocumentState {
+  documentId   String   @id @map("document_id") @db.Uuid
+  state        Bytes
+  lastUpdateId BigInt   @map("last_update_id")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_states")
+}
+
+model DocumentUpdate {
+  id         BigInt   @id @default(autoincrement())
+  documentId String   @map("document_id") @db.Uuid
+  data       Bytes
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, id])
+  @@map("document_updates")
+}
+
+model DocumentVersion {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  documentId  String      @map("document_id") @db.Uuid
+  kind        VersionKind
+  name        String?
+  state       Bytes
+  createdById String?     @map("created_by_id") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt(sort: Desc)])
+  @@map("document_versions")
+}
+
+model DocumentSearch {
+  documentId      String                  @id @map("document_id") @db.Uuid
+  content         String
+  vector          Unsupported("tsvector")
+  indexedUpdateId BigInt                  @map("indexed_update_id")
+  updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([vector], type: Gin)
+  @@map("document_search")
+}
+
+model CommentThread {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  documentId   String    @map("document_id") @db.Uuid
+  blockId      String    @map("block_id")
+  createdById  String?   @map("created_by_id") @db.Uuid
+  resolvedAt   DateTime? @map("resolved_at") @db.Timestamptz(3)
+  resolvedById String?   @map("resolved_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy  User?     @relation("threadAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  resolvedBy User?     @relation("threadResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  comments   Comment[]
+
+  @@index([documentId])
+  @@map("comment_threads")
+}
+
+model Comment {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  threadId  String    @map("thread_id") @db.Uuid
+  authorId  String?   @map("author_id") @db.Uuid
+  body      String
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  thread        CommentThread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author        User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  mentions      CommentMention[]
+  notifications Notification[]
+
+  @@index([threadId, createdAt])
+  @@map("comments")
+}
+
+model CommentMention {
+  commentId String @map("comment_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+  @@map("comment_mentions")
+}
+
+model Notification {
+  id         String           @id @default(uuid(7)) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  type       NotificationType
+  actorId    String?          @map("actor_id") @db.Uuid
+  documentId String?          @map("document_id") @db.Uuid
+  commentId  String?          @map("comment_id") @db.Uuid
+  dedupeKey  String           @unique @map("dedupe_key")
+  readAt     DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user     User      @relation("recipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor    User?     @relation("actor", fields: [actorId], references: [id], onDelete: SetNull)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  comment  Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId], where: raw("read_at IS NULL"), map: "notifications_unread_idx")
+  @@map("notifications")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid(7)) @db.Uuid
+  workspaceId            String             @unique @map("workspace_id") @db.Uuid
+  planId                 PlanTier           @map("plan_id")
+  status                 SubscriptionStatus
+  providerSubscriptionId String             @unique @map("provider_subscription_id")
+  currentPeriodEnd       DateTime           @map("current_period_end") @db.Timestamptz(3)
+  cancelAtPeriodEnd      Boolean            @default(false) @map("cancel_at_period_end")
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@map("subscriptions")
+}
+
+model CheckoutSession {
+  id          String                @id @default(uuid(7)) @db.Uuid
+  workspaceId String                @map("workspace_id") @db.Uuid
+  planId      PlanTier              @map("plan_id")
+  status      CheckoutSessionStatus @default(OPEN)
+  createdById String?               @map("created_by_id") @db.Uuid
+  expiresAt   DateTime              @map("expires_at") @db.Timestamptz(3)
+  completedAt DateTime?             @map("completed_at") @db.Timestamptz(3)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@map("checkout_sessions")
+}
+
+model BillingEvent {
+  id          String    @id
+  type        String
+  payload     Json
+  occurredAt  DateTime  @map("occurred_at") @db.Timestamptz(3)
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz(3)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(3)
+
+  @@map("billing_events")
+}
+
+model Attachment {
+  id           String           @id @default(uuid(7)) @db.Uuid
+  workspaceId  String           @map("workspace_id") @db.Uuid
+  documentId   String?          @map("document_id") @db.Uuid
+  uploadedById String?          @map("uploaded_by_id") @db.Uuid
+  objectKey    String           @unique @map("object_key")
+  fileName     String           @map("file_name")
+  contentType  String           @map("content_type")
+  sizeBytes    BigInt           @map("size_bytes")
+  status       AttachmentStatus @default(PENDING)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  uploadedBy User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([documentId])
+  @@map("attachments")
+}
