@@ -1,0 +1,35 @@
+{
+  "name": "collab-docs-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "lint": "eslint .",
+    "lint:fsd": "steiger ./src",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@feature-sliced/steiger-plugin": "^0.8.0",
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "steiger": "^0.8.0",
+    "tailwindcss": "^4",
+    "typescript": "~6.0.3"
+  },
+  "type": "module"
+}
