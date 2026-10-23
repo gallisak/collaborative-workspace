@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { ATTACHMENT_PATH } from '../attachments/attachment-rules.js';
 
 export type PublicMark =
   { type: 'bold' | 'italic' | 'strike' | 'code' } | { type: 'link'; href: string };
@@ -36,6 +37,11 @@ export function safeUrl(value: unknown, protocols: ReadonlySet<string>): string 
     return null;
   }
 }
+
+const imageSource = (value: unknown) =>
+  typeof value === 'string' && ATTACHMENT_PATH.test(value)
+    ? value
+    : safeUrl(value, IMAGE_PROTOCOLS);
 
 const elements = (node: Y.XmlElement | Y.XmlFragment, name?: string) =>
   node
@@ -129,7 +135,7 @@ function block(element: Y.XmlElement, depth: number): PublicBlock | null {
       };
     }
     case 'image': {
-      const src = safeUrl(element.getAttribute('src'), IMAGE_PROTOCOLS);
+      const src = imageSource(element.getAttribute('src'));
       const alt: unknown = element.getAttribute('alt');
       return src
         ? {

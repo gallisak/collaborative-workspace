@@ -3,6 +3,9 @@ import { validateEnv } from './env.schema.js';
 const validEnv = {
   DATABASE_URL: 'postgresql://collab:collab@localhost:5432/collab_docs',
   REDIS_URL: 'redis://localhost:6380',
+  S3_ACCESS_KEY: 'minioadmin',
+  S3_SECRET_KEY: 'minioadmin',
+  S3_BUCKET: 'collab-docs',
   JWT_ACCESS_SECRET: 'a'.repeat(16),
   REFRESH_TOKEN_SECRET: 'b'.repeat(16),
   REVALIDATE_SECRET: 'c'.repeat(16),

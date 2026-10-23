@@ -33,6 +33,13 @@ export const envSchema = z
     DATABASE_URL: z.url(),
     REDIS_URL: z.url(),
 
+    S3_ENDPOINT: z.url().default('http://localhost:9000'),
+    S3_PUBLIC_ENDPOINT: z.url().default('http://localhost:9000'),
+    S3_REGION: z.string().default('us-east-1'),
+    S3_ACCESS_KEY: z.string().min(1),
+    S3_SECRET_KEY: z.string().min(1),
+    S3_BUCKET: z.string().min(3),
+
     JWT_ACCESS_SECRET: z.string().min(16),
     JWT_ACCESS_TTL: duration('15m'),
     REFRESH_TOKEN_SECRET: z.string().min(16),
@@ -58,6 +65,15 @@ export const envSchema = z
     BILLING_WEBHOOK_SECRET: z.string().min(16),
     CHECKOUT_SESSION_TTL: duration('30m'),
     SUBSCRIPTION_PERIOD: duration('30d'),
+
+    ATTACHMENT_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(10 * 1024 * 1024),
+    ATTACHMENT_UPLOAD_TTL: duration('15m'),
+    ATTACHMENT_DOWNLOAD_TTL: duration('5m'),
+    ATTACHMENT_CLEANUP_INTERVAL_MS: z.coerce.number().int().min(1000).default(3_600_000),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {

@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { durationToSeconds } from '../../common/duration.js';
 import type { CheckoutSession, Plan } from '../../generated/prisma/client.js';
 import type { Env } from '../../infra/config/env.schema.js';
+import { AttachmentsRepository } from '../attachments/attachments.repository.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
 import type {
   CheckoutSessionDto,
@@ -39,6 +40,7 @@ export class BillingService {
   constructor(
     private readonly billing: BillingRepository,
     private readonly workspaceAccess: WorkspaceAccessService,
+    private readonly attachments: AttachmentsRepository,
     config: ConfigService<Env, true>,
   ) {
     this.checkoutTtlMs =
@@ -52,11 +54,18 @@ export class BillingService {
 
   async overview(userId: string, workspaceId: string): Promise<WorkspaceBillingDto> {
     await this.workspaceAccess.requireMember(workspaceId, userId);
-    const workspace = await this.billing.findWorkspace(workspaceId);
+    const [workspace, storageBytes] = await Promise.all([
+      this.billing.findWorkspace(workspaceId),
+      this.attachments.uploadedBytes(workspaceId),
+    ]);
     return {
       plan: toPlanDto(workspace.plan),
       subscription: workspace.subscription,
-      usage: { members: workspace._count.members, documents: workspace._count.documents },
+      usage: {
+        members: workspace._count.members,
+        documents: workspace._count.documents,
+        storageBytes: Number(storageBytes),
+      },
     };
   }
 

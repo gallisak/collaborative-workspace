@@ -48,6 +48,9 @@ export class UsageDto {
 
   @ApiProperty()
   documents: number;
+
+  @ApiProperty()
+  storageBytes: number;
 }
 
 export class WorkspaceBillingDto {

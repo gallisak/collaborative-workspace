@@ -10,7 +10,7 @@ Notion-like collaborative workspace: nested pages, block editor with real-time C
 backend/     NestJS — one codebase, several processes:
                src/main.ts    REST API          :4000
                src/collab.ts  collab gateway    :4001 (Yjs over WebSocket)
-               src/worker.ts  background jobs   (BullMQ: notifications, search indexing, page revalidation, billing events)
+               src/worker.ts  background jobs   (BullMQ: notifications, search indexing, page revalidation, billing events, upload cleanup)
              src/infra/   config, health, prisma
              prisma/      schema and migrations
              src/modules/ business modules
@@ -192,6 +192,30 @@ duplicate delivery and not processed again. An already processed event is skippe
 locked transaction, so concurrent deliveries cannot apply it twice. A different event for an
 already completed session is ignored, so a payment is never applied twice. Plan changes are
 strongly consistent: the workspace row is locked by both the plan change and the limit checks.
+
+## Attachments
+
+Images are stored in S3-compatible storage (MinIO locally) and never pass through the API:
+
+1. `POST /api/documents/:id/attachments` with name, type and exact size. The API checks edit
+   access, the allowed types (PNG, JPEG, GIF, WebP; no SVG because it can carry scripts), the
+   per-file limit (`ATTACHMENT_MAX_BYTES`) and the storage limit of the plan, then returns a
+   presigned POST. Its policy pins the object key, the exact size and the content type, so storage
+   itself rejects anything else.
+2. The browser uploads the file straight to MinIO, then calls `POST /api/attachments/:id/complete`.
+   The API checks the object in storage (size and type) before counting it as uploaded.
+3. The document stores the stable URL `/api/attachments/:id/content`. It redirects to a
+   short-lived presigned GET for readers of the document, and for anyone when the document is
+   published. The public page sanitizer accepts exactly this path besides `http(s)` URLs.
+
+**Storage limits.** Free 100 MB, Pro 10 GB, Team 100 GB. The check runs under the same workspace
+lock as other limits and counts uploads in progress (reservations within `ATTACHMENT_UPLOAD_TTL`),
+so parallel uploads cannot exceed the plan; exceeding it answers `402`. Usage is shown in
+`GET /api/workspaces/:id/billing`. Deleting an attachment frees its space; a repeatable worker job
+removes uploads that were never completed, together with their objects. Two S3 clients are used:
+one talks to MinIO from the backend (`S3_ENDPOINT`), the other only signs URLs for the browser
+(`S3_PUBLIC_ENDPOINT`), because the signature covers the host. MinIO allows CORS only from the
+frontend origin.
 
 ## Environment profiles
 

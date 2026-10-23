@@ -7,6 +7,7 @@ import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
+import { StorageModule } from './storage/storage.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RedisModule } from './redis/redis.module.js';
     RedisModule,
     CollabEventsModule,
     QueueModule,
+    StorageModule,
   ],
 })
 export class CoreModule {}

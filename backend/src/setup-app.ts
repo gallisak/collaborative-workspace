@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import type { Application } from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { API_PREFIX } from './common/api-prefix.js';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from './common/auth/auth-cookies.js';
 import { CORRELATION_HEADER } from './common/correlation.js';
 import type { Env } from './infra/config/env.schema.js';
@@ -17,7 +18,7 @@ export function setupApp(app: INestApplication) {
   if (trustProxy > 0) {
     (app.getHttpAdapter().getInstance() as Application).set('trust proxy', trustProxy);
   }
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  app.setGlobalPrefix(API_PREFIX, { exclude: ['health'] });
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({

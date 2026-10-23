@@ -94,12 +94,18 @@ describe('toPublicBlocks', () => {
     ]);
   });
 
+  it('keeps images stored as workspace attachments', () => {
+    const src = '/api/attachments/01a16800-0000-7000-8000-000000000001/content';
+    expect(render(el('image', { src }))).toEqual([{ type: 'image', src, alt: null }]);
+  });
+
   it('drops images with unsafe sources', () => {
     expect(
       render(
         el('image', { src: 'javascript:alert(1)' }),
         el('image', { src: 'data:image/svg+xml,<svg onload=alert(1)>' }),
         el('image', { src: '/relative.png' }),
+        el('image', { src: '/api/attachments/x/../../auth/logout' }),
       ),
     ).toEqual([]);
   });

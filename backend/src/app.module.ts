@@ -4,6 +4,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { CoreModule } from './infra/core.module.js';
 import { HealthModule } from './infra/health/health.module.js';
 import { ThrottlingModule } from './infra/throttling/throttling.module.js';
+import { AttachmentsModule } from './modules/attachments/attachments.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BillingModule } from './modules/billing/billing.module.js';
 import { CommentsModule } from './modules/comments/comments.module.js';
@@ -32,6 +33,7 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module.js';
     PublishingModule,
     SearchModule,
     BillingModule,
+    AttachmentsModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
