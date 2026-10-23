@@ -20,6 +20,9 @@ export class Room {
   private readonly controllers = new Map<number, CollabClient>();
   readonly persistence: RoomPersistence;
   closed = false;
+  holds = 0;
+  changedSinceVersion = false;
+  lastVersionAt = new Date();
 
   constructor(
     readonly documentId: string,
@@ -32,6 +35,7 @@ export class Room {
       if (origin === LOAD_ORIGIN) {
         return;
       }
+      this.changedSinceVersion = true;
       this.persistence.record(update);
       const message = encodeUpdate(update);
       for (const client of this.clients.values()) {

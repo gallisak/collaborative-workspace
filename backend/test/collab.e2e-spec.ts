@@ -1,31 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import type { AddressInfo } from 'node:net';
 import request from 'supertest';
-import { WebSocket } from 'ws';
-import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
-import { CollabModule } from '../src/collab.module.js';
 import { MailService } from '../src/infra/mail/mail.service.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
-import {
-  CapturingMail,
-  cleanupE2eData,
-  createTestApp,
-  signUp,
-  type TestUser,
-  WEB_ORIGIN,
-} from './helpers.js';
-
-const eventually = async (check: () => boolean | Promise<boolean>, timeoutMs = 5000) => {
-  const started = Date.now();
-  while (!(await check())) {
-    if (Date.now() - started > timeoutMs) {
-      throw new Error('Condition not met in time');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-};
+import { CapturingMail, cleanupE2eData, createTestApp, signUp, type TestUser } from './helpers.js';
+import { eventually, startCollab } from './collab-harness.js';
 
 const text = (doc: Y.Doc) => doc.getText('body').toJSON();
 
@@ -33,55 +12,24 @@ describe('Collab gateway (e2e)', () => {
   let api: INestApplication;
   let collab: INestApplication;
   let prisma: PrismaService;
-  let collabUrl: string;
+  let connect: Awaited<ReturnType<typeof startCollab>>['connect'];
+  let disconnectAll: () => void;
   const mail = new CapturingMail();
-  const providers: WebsocketProvider[] = [];
 
   beforeAll(async () => {
     ({ app: api, prisma } = await createTestApp({
       overrides: [{ token: MailService, value: mail }],
     }));
-    const moduleRef = await Test.createTestingModule({ imports: [CollabModule] }).compile();
-    collab = moduleRef.createNestApplication({ bufferLogs: true });
-    await collab.listen(0, '127.0.0.1');
-    const { port } = collab.getHttpServer().address() as AddressInfo;
-    collabUrl = `ws://127.0.0.1:${port}/documents`;
+    ({ app: collab, connect, disconnectAll } = await startCollab());
   });
 
-  afterEach(() => {
-    providers.splice(0).forEach((provider) => provider.destroy());
-  });
+  afterEach(() => disconnectAll());
 
   afterAll(async () => {
     await collab.close();
     await cleanupE2eData(prisma);
     await api.close();
   });
-
-  const connect = (
-    documentId: string,
-    { cookies, origin = WEB_ORIGIN }: { cookies?: string; origin?: string },
-  ) => {
-    const headers = { Origin: origin, ...(cookies && { Cookie: cookies }) };
-    class AuthenticatedSocket extends WebSocket {
-      constructor(url: string, protocols?: string | string[]) {
-        super(url, protocols, { headers });
-      }
-    }
-    const doc = new Y.Doc();
-    const provider = new WebsocketProvider(collabUrl, documentId, doc, {
-      WebSocketPolyfill: AuthenticatedSocket as unknown as typeof globalThis.WebSocket,
-      disableBc: true,
-    });
-    providers.push(provider);
-    const closedWith = new Promise<number>((resolve) =>
-      provider.on('closed', (event) => resolve(event.code)),
-    );
-    const synced = new Promise<void>((resolve) =>
-      provider.on('sync', (isSynced: boolean) => isSynced && resolve()),
-    );
-    return { doc, provider, synced, closedWith };
-  };
 
   const join = async (owner: TestUser, workspaceId: string, role: string) => {
     const member = await signUp(api);

@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
 import { PermissionsModule } from './modules/permissions/permissions.module.js';
 import { UsersModule } from './modules/users/users.module.js';
+import { VersionsModule } from './modules/versions/versions.module.js';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module.js';
 
 @Module({
@@ -20,6 +21,7 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module.js';
     PermissionsModule,
     WorkspacesModule,
     DocumentsModule,
+    VersionsModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })

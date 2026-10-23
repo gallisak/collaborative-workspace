@@ -39,6 +39,8 @@ export const envSchema = z
     COLLAB_COMPACTION_THRESHOLD: z.coerce.number().int().min(1).default(100),
     COLLAB_MAX_MESSAGE_BYTES: z.coerce.number().int().positive().default(5_000_000),
     COLLAB_HEARTBEAT_MS: z.coerce.number().int().min(1000).default(30_000),
+    VERSION_INTERVAL_MS: z.coerce.number().int().min(100).default(600_000),
+    VERSION_RETENTION_AUTO: z.coerce.number().int().min(1).default(50),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {

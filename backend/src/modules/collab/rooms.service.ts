@@ -6,6 +6,7 @@ import { DocumentStore } from './document-store.js';
 import { CloseCode } from './protocol.js';
 import { type CollabClient, LOAD_ORIGIN, Room } from './room.js';
 import { type PersistenceOptions, RoomPersistence } from './room-persistence.js';
+import { SnapshotsService } from './snapshots.service.js';
 
 @Injectable()
 export class RoomsService {
@@ -16,6 +17,7 @@ export class RoomsService {
 
   constructor(
     private readonly store: DocumentStore,
+    private readonly snapshots: SnapshotsService,
     config: ConfigService<Env, true>,
   ) {
     this.options = {
@@ -25,21 +27,29 @@ export class RoomsService {
   }
 
   async join(documentId: string, workspaceId: string, client: CollabClient): Promise<Room> {
-    for (;;) {
-      const room = await this.acquire(documentId, workspaceId);
-      if (!room.closed) {
-        room.join(client);
-        return room;
-      }
+    const room = await this.acquireOpen(documentId, workspaceId);
+    room.join(client);
+    return room;
+  }
+
+  async use<T>(documentId: string, workspaceId: string, work: (room: Room) => Promise<T>) {
+    const room = await this.acquireOpen(documentId, workspaceId);
+    room.holds++;
+    try {
+      return await work(room);
+    } finally {
+      room.holds--;
+      await this.release(room);
     }
   }
 
   async release(room: Room) {
-    if (room.clients.size > 0 || room.closed) {
+    if (!this.isIdle(room)) {
       return;
     }
     await room.persistence.flushAndCompact();
-    if (room.clients.size === 0 && this.loaded.get(room.documentId) === room) {
+    await this.snapshots.takeIfChanged(room);
+    if (this.isIdle(room) && this.loaded.get(room.documentId) === room) {
       this.forget(room);
       this.logger.debug({ documentId: room.documentId }, 'Room closed');
     }
@@ -57,9 +67,23 @@ export class RoomsService {
           client.socket.close(CloseCode.ServerRestart, 'Server restarting');
         }
         await room.persistence.flushAndCompact();
+        await this.snapshots.takeIfChanged(room);
         this.forget(room);
       }),
     );
+  }
+
+  private isIdle(room: Room) {
+    return !room.closed && room.clients.size === 0 && room.holds === 0;
+  }
+
+  private async acquireOpen(documentId: string, workspaceId: string): Promise<Room> {
+    for (;;) {
+      const room = await this.acquire(documentId, workspaceId);
+      if (!room.closed) {
+        return room;
+      }
+    }
   }
 
   private acquire(documentId: string, workspaceId: string): Promise<Room> {
@@ -76,15 +100,25 @@ export class RoomsService {
   }
 
   private async load(documentId: string, workspaceId: string): Promise<Room> {
-    const stored = await this.store.load(documentId);
-    const room = new Room(
+    const [stored, lastVersionAt] = await Promise.all([
+      this.store.load(documentId),
+      this.snapshots.lastVersionAt(documentId),
+    ]);
+    const room: Room = new Room(
       documentId,
       workspaceId,
       (doc) =>
-        new RoomPersistence(documentId, doc, this.store, this.options, stored, () =>
-          this.evict(documentId),
+        new RoomPersistence(
+          documentId,
+          doc,
+          this.store,
+          this.options,
+          stored,
+          () => this.evict(documentId),
+          () => this.snapshots.takeIfDue(room),
         ),
     );
+    room.lastVersionAt = lastVersionAt;
     Y.transact(
       room.doc,
       () => {

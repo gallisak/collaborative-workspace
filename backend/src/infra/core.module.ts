@@ -5,6 +5,7 @@ import { envFilePaths, validateEnv } from './config/env.schema.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
 
 @Module({
@@ -20,6 +21,7 @@ import { RedisModule } from './redis/redis.module.js';
     PrismaModule,
     RedisModule,
     CollabEventsModule,
+    QueueModule,
   ],
 })
 export class CoreModule {}

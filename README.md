@@ -80,6 +80,14 @@ document deleted, `1012` server restart.
 4. Cold start loads the snapshot and replays rows with `id > last_update_id`. Yjs updates are
    idempotent, so an update that ends up both in the snapshot and in the log is harmless.
 
+**Versions.** The gateway takes an automatic version every `VERSION_INTERVAL_MS` of editing and
+when the last client leaves (only if something changed), keeping the newest
+`VERSION_RETENTION_AUTO` automatic ones. Manual versions and restores go through the BullMQ
+`collab` queue: the API checks access and enqueues, the gateway executes, because it owns the live
+`Y.Doc` and is the only writer of document content. A restore first saves the current state as
+"Before restore", then replaces the content as a regular CRDT change, so everyone connected sees it
+immediately and edits made at the same moment are merged instead of lost.
+
 **Access changes.** The API publishes `collab:access-changed` (Redis pub/sub) after member,
 role, sharing, move and delete changes. The gateway re-resolves access for open sessions: they are
 downgraded to read-only or closed with `4404`.

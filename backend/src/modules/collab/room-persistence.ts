@@ -27,6 +27,7 @@ export class RoomPersistence {
     private readonly options: PersistenceOptions,
     stored: StoredDocument,
     private readonly onDocumentGone: () => void,
+    private readonly afterWrite: () => Promise<void>,
   ) {
     this.snapshotUpdateId = stored.snapshotUpdateId;
     this.lastUpdateId = stored.updates.at(-1)?.id ?? stored.snapshotUpdateId;
@@ -84,6 +85,7 @@ export class RoomPersistence {
     if (this.updatesSinceSnapshot >= this.options.compactionThreshold) {
       await this.compact();
     }
+    await this.afterWrite();
   }
 
   private async compact() {

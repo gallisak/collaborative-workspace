@@ -35,6 +35,7 @@ const setup = (compactionThreshold = 100) => {
     { flushIntervalMs: 20, compactionThreshold },
     empty,
     () => undefined,
+    () => Promise.resolve(),
   );
   doc.on('update', (update: Uint8Array) => persistence.record(update));
   return { doc, store, persistence };
