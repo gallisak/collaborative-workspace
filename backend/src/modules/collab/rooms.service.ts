@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Y from 'yjs';
 import type { Env } from '../../infra/config/env.schema.js';
+import { PageRevalidationService } from '../publishing/page-revalidation.service.js';
 import { DocumentStore } from './document-store.js';
 import { CloseCode } from './protocol.js';
 import { type CollabClient, LOAD_ORIGIN, Room } from './room.js';
@@ -18,6 +19,7 @@ export class RoomsService {
   constructor(
     private readonly store: DocumentStore,
     private readonly snapshots: SnapshotsService,
+    private readonly pages: PageRevalidationService,
     config: ConfigService<Env, true>,
   ) {
     this.options = {
@@ -115,7 +117,10 @@ export class RoomsService {
           this.options,
           stored,
           () => this.evict(documentId),
-          () => this.snapshots.takeIfDue(room),
+          async () => {
+            await this.snapshots.takeIfDue(room);
+            await this.pages.scheduleIfPublished([documentId]);
+          },
         ),
     );
     room.lastVersionAt = lastVersionAt;

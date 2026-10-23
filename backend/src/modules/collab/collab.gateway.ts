@@ -22,7 +22,7 @@ import { TokenService } from '../auth/token.service.js';
 import { canEdit } from '../permissions/document-access.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import { UsersService } from '../users/users.service.js';
-import { documentIdFromUrl, isAllowedOrigin } from './connection-request.js';
+import { documentIdFromUrl, isAllowedOrigin, shareTokenFromUrl } from './connection-request.js';
 import {
   CloseCode,
   encodeAwareness,
@@ -44,6 +44,8 @@ class ConnectionRejected extends Error {
     super(reason);
   }
 }
+
+const MAX_TIMER_MS = 2 ** 31 - 1;
 
 const toBytes = (data: RawData): Uint8Array =>
   data instanceof ArrayBuffer
@@ -107,6 +109,7 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
     const buffered: Uint8Array[] = [];
     let client: CollabClient | undefined;
     let room: Room | undefined;
+    let expiry: NodeJS.Timeout | undefined;
 
     this.alive.add(socket);
     socket.on('pong', () => this.alive.add(socket));
@@ -119,6 +122,7 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
       }
     });
     socket.on('close', () => {
+      clearTimeout(expiry);
       if (client && room) {
         room.leave(client);
         void this.rooms.release(room);
@@ -126,13 +130,17 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
     });
 
     try {
-      const { documentId, workspaceId, user, canWrite } = await this.authenticate(req);
-      client = { socket, user, canWrite, clientIds: new Set() };
+      const { documentId, workspaceId, user, canWrite, shareToken, linkExpiresAt } =
+        await this.authenticate(req);
+      client = { socket, user, canWrite, shareToken, clientIds: new Set() };
       room = await this.rooms.join(documentId, workspaceId, client);
       if (socket.readyState !== socket.OPEN) {
         room.leave(client);
         void this.rooms.release(room);
         return;
+      }
+      if (linkExpiresAt) {
+        expiry = this.recheckAt(room, client, linkExpiresAt);
       }
       send(socket, encodeSyncStep1(room.doc));
       const presence = [...room.awareness.getStates().keys()];
@@ -174,17 +182,26 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
     if (!user) {
       throw new ConnectionRejected(CloseCode.Unauthorized, 'Not authenticated');
     }
-    const resolved = await this.documentAccess
-      .resolve(documentId, user.id)
-      .catch(() =>
-        Promise.reject(new ConnectionRejected(CloseCode.NotFound, 'Document not found')),
-      );
+    const shareToken = shareTokenFromUrl(req.url);
+    const resolved = await this.access(documentId, user.id, shareToken).catch(() =>
+      Promise.reject(new ConnectionRejected(CloseCode.NotFound, 'Document not found')),
+    );
     return {
       documentId,
       workspaceId: resolved.document.workspaceId,
       user: { id: user.id, name: user.name },
       canWrite: canEdit(resolved.access),
+      shareToken,
+      linkExpiresAt: resolved.linkExpiresAt,
     };
+  }
+
+  private access(documentId: string, userId: string, shareToken: string | null) {
+    return shareToken
+      ? this.documentAccess.resolveWithLink(documentId, userId, shareToken)
+      : this.documentAccess
+          .resolve(documentId, userId)
+          .then((resolved) => ({ ...resolved, linkExpiresAt: null }));
   }
 
   private onMessage(room: Room, client: CollabClient, message: Uint8Array) {
@@ -236,13 +253,22 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
   private async recheckWorkspace(workspaceId: string) {
     for (const room of this.rooms.inWorkspace(workspaceId)) {
       for (const client of [...room.clients.values()]) {
-        try {
-          const { access } = await this.documentAccess.resolve(room.documentId, client.user.id);
-          client.canWrite = canEdit(access);
-        } catch {
-          client.socket.close(CloseCode.NotFound, 'Access revoked or document deleted');
-        }
+        await this.recheck(room, client);
       }
+    }
+  }
+
+  private recheckAt(room: Room, client: CollabClient, at: Date) {
+    const delay = Math.min(Math.max(0, at.getTime() - Date.now()), MAX_TIMER_MS);
+    return setTimeout(() => void this.recheck(room, client), delay);
+  }
+
+  private async recheck(room: Room, client: CollabClient) {
+    try {
+      const { access } = await this.access(room.documentId, client.user.id, client.shareToken);
+      client.canWrite = canEdit(access);
+    } catch {
+      client.socket.close(CloseCode.NotFound, 'Access revoked or document deleted');
     }
   }
 

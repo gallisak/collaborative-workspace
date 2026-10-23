@@ -5,6 +5,7 @@ import { CollabEventsService } from '../../infra/collab-events/collab-events.ser
 import { type Transaction, UnitOfWork } from '../../infra/prisma/unit-of-work.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import type { DocumentAccess } from '../permissions/document-access.js';
+import { PageRevalidationService } from '../publishing/page-revalidation.service.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
 import { UsersService } from '../users/users.service.js';
 import { assertCapacity } from '../workspaces/plan-limits.js';
@@ -43,6 +44,7 @@ export class DocumentsService {
     private readonly treeCache: TreeCacheService,
     private readonly uow: UnitOfWork,
     private readonly collabEvents: CollabEventsService,
+    private readonly pages: PageRevalidationService,
   ) {}
 
   async tree(userId: string, workspaceId: string): Promise<DocumentNodeDto[]> {
@@ -83,6 +85,7 @@ export class DocumentsService {
     const { document } = await this.documentAccess.require(documentId, userId, 'EDIT');
     await this.documents.rename(documentId, title);
     await this.treeCache.invalidate(document.workspaceId);
+    await this.pages.scheduleIfPublished([documentId]);
     return this.get(userId, documentId);
   }
 
@@ -122,8 +125,9 @@ export class DocumentsService {
     });
     await this.treeCache.invalidate(document.workspaceId);
     await this.collabEvents.accessChanged(document.workspaceId);
+    await this.pages.scheduleIfPublished(deleted);
     this.logger.log(
-      { workspaceId: document.workspaceId, documentId, deleted, userId },
+      { workspaceId: document.workspaceId, documentId, deleted: deleted.length, userId },
       'Document deleted',
     );
   }

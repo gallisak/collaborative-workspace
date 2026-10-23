@@ -5,7 +5,11 @@ import { DURATION_PATTERN } from '../../common/duration.js';
 const duration = (fallback: string) =>
   z.string().regex(DURATION_PATTERN, 'expected duration like 900, 15m, 7d').default(fallback);
 
-const PRODUCTION_SECRETS = ['JWT_ACCESS_SECRET', 'REFRESH_TOKEN_SECRET'] as const;
+const PRODUCTION_SECRETS = [
+  'JWT_ACCESS_SECRET',
+  'REFRESH_TOKEN_SECRET',
+  'REVALIDATE_SECRET',
+] as const;
 const INSECURE_SECRET = /change-me/i;
 
 export const envSchema = z
@@ -23,6 +27,7 @@ export const envSchema = z
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
     LOGIN_EMAIL_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(5),
     LOGIN_IP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+    SHARE_LINK_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(10),
 
     DATABASE_URL: z.url(),
     REDIS_URL: z.url(),
@@ -41,6 +46,10 @@ export const envSchema = z
     COLLAB_HEARTBEAT_MS: z.coerce.number().int().min(1000).default(30_000),
     VERSION_INTERVAL_MS: z.coerce.number().int().min(100).default(600_000),
     VERSION_RETENTION_AUTO: z.coerce.number().int().min(1).default(50),
+
+    REVALIDATE_URL: z.url().default('http://localhost:3000/internal/revalidate'),
+    REVALIDATE_SECRET: z.string().min(16),
+    REVALIDATE_DELAY_MS: z.coerce.number().int().min(100).default(5000),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {

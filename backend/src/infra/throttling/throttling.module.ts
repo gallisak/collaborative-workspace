@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule, type ThrottlerModuleOptions } from '@n
 import type { Env } from '../config/env.schema.js';
 import { isLoginRequest, loginEmailTracker, type TrackedRequest } from './login-throttle.js';
 import { RedisThrottlerStorage } from './redis-throttler.storage.js';
+import { isShareLinkCreation, userTracker } from './share-link-throttle.js';
 
 const MINUTE = 60_000;
 const notLogin = (context: Parameters<typeof isLoginRequest>[0]) => !isLoginRequest(context);
@@ -45,6 +46,13 @@ class ThrottlerStorageModule {}
             limit: config.get('LOGIN_IP_RATE_LIMIT_PER_MINUTE', { infer: true }),
             blockDuration: MINUTE,
             skipIf: notLogin,
+          },
+          {
+            name: 'share-links',
+            ttl: MINUTE,
+            limit: config.get('SHARE_LINK_RATE_LIMIT_PER_MINUTE', { infer: true }),
+            skipIf: (context) => !isShareLinkCreation(context),
+            getTracker: (req) => userTracker(req as Parameters<typeof userTracker>[0]),
           },
         ],
         storage,

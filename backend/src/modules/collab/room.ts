@@ -10,6 +10,7 @@ export interface CollabClient {
   socket: WebSocket;
   user: PresenceUser;
   canWrite: boolean;
+  shareToken: string | null;
   clientIds: Set<number>;
 }
 

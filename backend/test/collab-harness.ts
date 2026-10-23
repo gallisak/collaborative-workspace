@@ -26,7 +26,7 @@ export async function startCollab() {
 
   const connect = (
     documentId: string,
-    { cookies, origin = WEB_ORIGIN }: { cookies?: string; origin?: string },
+    { cookies, origin = WEB_ORIGIN, share }: { cookies?: string; origin?: string; share?: string },
   ) => {
     const headers = { Origin: origin, ...(cookies && { Cookie: cookies }) };
     class AuthenticatedSocket extends WebSocket {
@@ -38,6 +38,7 @@ export async function startCollab() {
     const provider = new WebsocketProvider(`ws://127.0.0.1:${port}/documents`, documentId, doc, {
       WebSocketPolyfill: AuthenticatedSocket as unknown as typeof globalThis.WebSocket,
       disableBc: true,
+      params: share ? { share } : {},
     });
     providers.push(provider);
     const closedWith = new Promise<number>((resolve) =>

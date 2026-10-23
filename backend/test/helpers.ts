@@ -28,8 +28,12 @@ export async function createTestApp({ overrides = [] }: TestAppOptions = {}) {
   return { app, prisma: app.get(PrismaService) };
 }
 
-export async function startWorker() {
-  const moduleRef = await Test.createTestingModule({ imports: [WorkerModule] }).compile();
+export async function startWorker({ overrides = [] }: TestAppOptions = {}) {
+  let builder = Test.createTestingModule({ imports: [WorkerModule] });
+  for (const { token, value } of overrides) {
+    builder = builder.overrideProvider(token).useValue(value);
+  }
+  const moduleRef = await builder.compile();
   const worker = moduleRef.createNestApplication({ bufferLogs: true });
   await worker.init();
   return worker;

@@ -87,8 +87,8 @@ export class DocumentsRepository extends PrismaRepository {
     return rows[0]?.found ?? false;
   }
 
-  softDeleteSubtree(rootId: string, at: Date, tx: Transaction) {
-    return tx.$executeRaw`
+  async softDeleteSubtree(rootId: string, at: Date, tx: Transaction): Promise<string[]> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
       WITH RECURSIVE subtree AS (
         SELECT id, 0 AS depth FROM documents WHERE id = ${rootId}::uuid
         UNION ALL
@@ -97,7 +97,9 @@ export class DocumentsRepository extends PrismaRepository {
         WHERE d.deleted_at IS NULL AND subtree.depth < ${MAX_TREE_DEPTH}
       )
       UPDATE documents SET deleted_at = ${at}, updated_at = ${at}
-      WHERE id IN (SELECT id FROM subtree) AND deleted_at IS NULL`;
+      WHERE id IN (SELECT id FROM subtree) AND deleted_at IS NULL
+      RETURNING id`;
+    return rows.map((row) => row.id);
   }
 
   listPermissions(documentId: string) {

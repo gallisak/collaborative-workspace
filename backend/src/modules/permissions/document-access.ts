@@ -51,6 +51,8 @@ export const canView = (access: DocumentAccess) => hasAccess(access, 'VIEW');
 export const canEdit = (access: DocumentAccess) => hasAccess(access, 'EDIT');
 export const canManage = (access: DocumentAccess) => hasAccess(access, 'MANAGE');
 
+export const SHARE_TOKEN_PATTERN = /^[\w-]{32}$/;
+
 export function isShareLinkActive(
   link: { revokedAt: Date | null; expiresAt: Date | null },
   now: Date,

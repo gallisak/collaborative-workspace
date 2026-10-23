@@ -10,7 +10,7 @@ Notion-like collaborative workspace: nested pages, block editor with real-time C
 backend/     NestJS — one codebase, several processes:
                src/main.ts    REST API          :4000
                src/collab.ts  collab gateway    :4001 (Yjs over WebSocket)
-               src/worker.ts  background jobs   (BullMQ: notifications)
+               src/worker.ts  background jobs   (BullMQ: notifications, page revalidation)
              src/infra/   config, health, prisma
              prisma/      schema and migrations
              src/modules/ business modules
@@ -111,6 +111,29 @@ re-checks access at delivery time and inserts notifications with a unique
 `dedupe_key = mention:<comment>:<user>`, so a retried or duplicated job never creates a second
 notification. Authors are not notified about their own mentions, and notifications of deleted
 documents or comments are hidden.
+
+## Publishing
+
+A manager of a document creates share links: `VIEW` (public read-only page) or `EDIT` (signed in
+users who open the link can edit it in real time), optionally with an expiry. Link creation is rate
+limited per user (`SHARE_LINK_RATE_LIMIT_PER_MINUTE`), tokens are 192-bit random values, and
+revoking or expiring a link takes effect immediately for the public API and for open collaboration
+sessions (an expiry timer and the access-changed event close them with `4404`).
+
+`GET /api/public/documents/:token` needs no session and returns the title, an SEO description and
+the content as sanitized JSON blocks. Sanitization happens on the server against a whitelist:
+only paragraph, heading, bullet/ordered/task list, code block and image nodes, only known
+attributes, only `http(s)` image sources and `http(s)`/`mailto` links. Anything else, such as raw
+HTML, `javascript:` or `data:` URLs, or unknown nodes and attributes, is dropped, and text is never
+interpreted as markup.
+
+**Revalidation.** Public pages are cached by Next.js (ISR). After the gateway persists changes of a
+published document, it enqueues `page.revalidate` with a delay and a BullMQ deduplication key per
+document, so a page is revalidated at most once per `REVALIDATE_DELAY_MS` however fast people
+type, and editing is never blocked by it. The worker calls `REVALIDATE_URL` with
+`REVALIDATE_SECRET` and retries with backoff if the frontend is unavailable. Renames, deletion,
+revoking and expiry of a link revalidate the page too. Visitors may see content up to a few seconds
+old (eventual consistency); local edits that have not reached the server yet are not published.
 
 ## Environment profiles
 

@@ -5,6 +5,7 @@ const validEnv = {
   REDIS_URL: 'redis://localhost:6380',
   JWT_ACCESS_SECRET: 'a'.repeat(16),
   REFRESH_TOKEN_SECRET: 'b'.repeat(16),
+  REVALIDATE_SECRET: 'c'.repeat(16),
 };
 
 describe('validateEnv', () => {
@@ -50,6 +51,7 @@ describe('validateEnv in production', () => {
       NODE_ENV: 'production',
       JWT_ACCESS_SECRET: strong('x'),
       REFRESH_TOKEN_SECRET: strong('y'),
+      REVALIDATE_SECRET: strong('z'),
     });
 
     expect(env.NODE_ENV).toBe('production');
