@@ -18,6 +18,7 @@ export const envSchema = z
       .default('info'),
     LOG_PRETTY: z.stringbool().default(false),
     CORS_ORIGIN: z.string().default('http://localhost:3000'),
+    FRONTEND_URL: z.url().default('http://localhost:3000'),
     TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
     LOGIN_EMAIL_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(5),
@@ -31,6 +32,8 @@ export const envSchema = z
     REFRESH_TOKEN_SECRET: z.string().min(16),
     REFRESH_TOKEN_TTL: duration('30d'),
     REFRESH_ROTATION_GRACE_SECONDS: z.coerce.number().int().min(0).max(60).default(10),
+
+    INVITATION_TTL: duration('7d'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {

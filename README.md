@@ -32,6 +32,7 @@ docker compose up -d                 # postgres :5432, redis :6380, minio :9000 
 cd backend
 npm install                          # also generates the Prisma client
 npm run prisma:deploy                # apply migrations
+npm run db:seed                      # demo users and workspace
 npm run start:dev                    # REST API on :4000
 npm run start:collab:dev             # collab gateway on :4001
 
@@ -41,6 +42,18 @@ npm run dev                          # :3000
 ```
 
 Health checks: `GET http://localhost:4000/health`, `GET http://localhost:4001/health`.
+
+## Demo data
+
+`npm run db:seed` creates a Free-plan workspace with three members, password `Password123!`:
+
+| Email               | Role   |
+| ------------------- | ------ |
+| `ann@collab.local`  | Owner  |
+| `bob@collab.local`  | Editor |
+| `cara@collab.local` | Viewer |
+
+API docs: `http://localhost:4000/api/docs`.
 
 ## Environment profiles
 
