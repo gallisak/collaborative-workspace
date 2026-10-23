@@ -6,6 +6,7 @@ const validEnv = {
   JWT_ACCESS_SECRET: 'a'.repeat(16),
   REFRESH_TOKEN_SECRET: 'b'.repeat(16),
   REVALIDATE_SECRET: 'c'.repeat(16),
+  BILLING_WEBHOOK_SECRET: 'd'.repeat(16),
 };
 
 describe('validateEnv', () => {
@@ -52,6 +53,7 @@ describe('validateEnv in production', () => {
       JWT_ACCESS_SECRET: strong('x'),
       REFRESH_TOKEN_SECRET: strong('y'),
       REVALIDATE_SECRET: strong('z'),
+      BILLING_WEBHOOK_SECRET: strong('w'),
     });
 
     expect(env.NODE_ENV).toBe('production');

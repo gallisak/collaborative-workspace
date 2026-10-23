@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { DefaultJobOptions } from 'bullmq';
 import type { Env } from '../config/env.schema.js';
 import { redisConnectionFromUrl } from '../redis/redis-url.js';
+import { BILLING_QUEUE } from './billing-jobs.js';
 import { COLLAB_QUEUE } from './collab-jobs.js';
 import { NOTIFICATIONS_QUEUE } from './notification-jobs.js';
 import { PUBLISHING_QUEUE } from './publishing-jobs.js';
@@ -21,6 +22,7 @@ const queues = BullModule.registerQueue(
   { name: NOTIFICATIONS_QUEUE, defaultJobOptions },
   { name: PUBLISHING_QUEUE, defaultJobOptions },
   { name: SEARCH_QUEUE, defaultJobOptions },
+  { name: BILLING_QUEUE, defaultJobOptions },
 );
 
 @Global()

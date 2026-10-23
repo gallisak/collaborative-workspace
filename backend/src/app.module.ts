@@ -5,6 +5,7 @@ import { CoreModule } from './infra/core.module.js';
 import { HealthModule } from './infra/health/health.module.js';
 import { ThrottlingModule } from './infra/throttling/throttling.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { BillingModule } from './modules/billing/billing.module.js';
 import { CommentsModule } from './modules/comments/comments.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
@@ -30,6 +31,7 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module.js';
     NotificationsModule,
     PublishingModule,
     SearchModule,
+    BillingModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })

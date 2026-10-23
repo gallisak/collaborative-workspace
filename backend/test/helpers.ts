@@ -22,7 +22,7 @@ export async function createTestApp({ overrides = [] }: TestAppOptions = {}) {
     builder = builder.overrideProvider(token).useValue(value);
   }
   const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication({ bufferLogs: true });
+  const app = moduleRef.createNestApplication({ bufferLogs: true, rawBody: true });
   setupApp(app);
   await app.init();
   return { app, prisma: app.get(PrismaService) };

@@ -10,7 +10,7 @@ Notion-like collaborative workspace: nested pages, block editor with real-time C
 backend/     NestJS — one codebase, several processes:
                src/main.ts    REST API          :4000
                src/collab.ts  collab gateway    :4001 (Yjs over WebSocket)
-               src/worker.ts  background jobs   (BullMQ: notifications, search indexing, page revalidation)
+               src/worker.ts  background jobs   (BullMQ: notifications, search indexing, page revalidation, billing events)
              src/infra/   config, health, prisma
              prisma/      schema and migrations
              src/modules/ business modules
@@ -165,6 +165,33 @@ consistent because they are checked against the live tables at query time. A rep
 `index.reconcile` job (`SEARCH_RECONCILE_INTERVAL_MS`) re-enqueues documents whose index is missing
 or older than their content or title, so a lost job (for example while Redis was down) and the
 seeded demo documents are indexed too.
+
+## Billing
+
+Plans: Free (3 members, 100 documents), Pro (10 members), Team (50 members). Limits are enforced
+when inviting members and creating documents, with `402` and an explanation instead of an error.
+
+The flow mirrors Stripe Checkout with a mock provider:
+
+1. An owner or admin starts a checkout (`POST /api/workspaces/:id/billing/checkout`). The API
+   creates a checkout session with an expiry and returns the URL of the payment page. Switching to
+   a plan smaller than the current team is refused with `409`.
+2. Paying (`POST /api/billing/checkout-sessions/:id/pay`) is the mock provider: it builds a
+   `checkout.session.completed` event and delivers it to the webhook signed with HMAC-SHA256
+   (`Billing-Signature: t=<timestamp>,v1=<hex>`), exactly as an external provider would call
+   `POST /api/billing/webhook`.
+3. The webhook verifies the signature over the raw body (with a 5 minute tolerance against
+   replays), stores the event in `billing_events` keyed by the provider event id and answers `200`
+   right away. Processing runs in the worker through the `billing` queue.
+4. The worker locks the event, the checkout session and the workspace (`FOR UPDATE`) and, in one
+   transaction, switches the plan, upserts the subscription, completes the session and marks the
+   event processed.
+
+**Idempotency.** A redelivered event is detected by its id (`ON CONFLICT DO NOTHING`), logged as a
+duplicate delivery and not processed again. An already processed event is skipped inside the
+locked transaction, so concurrent deliveries cannot apply it twice. A different event for an
+already completed session is ignored, so a payment is never applied twice. Plan changes are
+strongly consistent: the workspace row is locked by both the plan change and the limit checks.
 
 ## Environment profiles
 

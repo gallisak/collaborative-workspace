@@ -9,6 +9,7 @@ const PRODUCTION_SECRETS = [
   'JWT_ACCESS_SECRET',
   'REFRESH_TOKEN_SECRET',
   'REVALIDATE_SECRET',
+  'BILLING_WEBHOOK_SECRET',
 ] as const;
 const INSECURE_SECRET = /change-me/i;
 
@@ -53,6 +54,10 @@ export const envSchema = z
 
     SEARCH_INDEX_DELAY_MS: z.coerce.number().int().min(0).default(2000),
     SEARCH_RECONCILE_INTERVAL_MS: z.coerce.number().int().min(1000).default(600_000),
+
+    BILLING_WEBHOOK_SECRET: z.string().min(16),
+    CHECKOUT_SESSION_TTL: duration('30m'),
+    SUBSCRIPTION_PERIOD: duration('30d'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {
