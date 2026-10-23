@@ -1,8 +1,9 @@
 import { isRequestFromAllowedOrigin } from './origin-policy.js';
 
 const allowed = ['http://localhost:3000'];
+const ownOrigin = 'http://localhost:4000';
 const check = (method: string, origin: string | undefined, hasSessionCookie: boolean) =>
-  isRequestFromAllowedOrigin({ method, origin, hasSessionCookie }, allowed);
+  isRequestFromAllowedOrigin({ method, origin, ownOrigin, hasSessionCookie }, allowed);
 
 describe('isRequestFromAllowedOrigin', () => {
   it.each(['GET', 'HEAD', 'OPTIONS', 'get'])('lets safe method %s through', (method) => {
@@ -11,6 +12,10 @@ describe('isRequestFromAllowedOrigin', () => {
 
   it('accepts mutations from an allowed origin', () => {
     expect(check('POST', 'http://localhost:3000', true)).toBe(true);
+  });
+
+  it('accepts mutations from the API origin itself, such as Swagger UI', () => {
+    expect(check('POST', 'http://localhost:4000', true)).toBe(true);
   });
 
   it('rejects mutations from a foreign origin even without a session', () => {

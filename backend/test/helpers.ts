@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module.js';
 import type { MailMessage } from '../src/infra/mail/mail.service.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
 import { setupApp } from '../src/setup-app.js';
+import { WorkerModule } from '../src/worker.module.js';
 
 export const PASSWORD = 'Password123!';
 export const WEB_ORIGIN = 'http://localhost:3000';
@@ -25,6 +26,13 @@ export async function createTestApp({ overrides = [] }: TestAppOptions = {}) {
   setupApp(app);
   await app.init();
   return { app, prisma: app.get(PrismaService) };
+}
+
+export async function startWorker() {
+  const moduleRef = await Test.createTestingModule({ imports: [WorkerModule] }).compile();
+  const worker = moduleRef.createNestApplication({ bufferLogs: true });
+  await worker.init();
+  return worker;
 }
 
 export const uniqueEmail = (prefix = 'user') => `${prefix}-${randomUUID()}${E2E_EMAIL_DOMAIN}`;

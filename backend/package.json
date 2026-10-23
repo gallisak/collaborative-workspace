@@ -13,6 +13,8 @@
     "start:debug": "nest start --debug --watch",
     "start:collab": "node dist/collab.js",
     "start:collab:dev": "nest start --watch --entryFile collab",
+    "start:worker": "node dist/worker.js",
+    "start:worker:dev": "nest start --watch --entryFile worker",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

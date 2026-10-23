@@ -29,20 +29,28 @@ export class DocumentAccessService extends PrismaRepository {
     if (!document) {
       throw new NotFoundException('Document not found');
     }
+    const access = await this.accessOf(document, userId, tx);
+    if (access === 'NONE') {
+      throw new NotFoundException('Document not found');
+    }
+    return { document, access };
+  }
+
+  async accessOf(
+    document: Pick<Document, 'id' | 'workspaceId'>,
+    userId: string,
+    tx?: Transaction,
+  ): Promise<DocumentAccess> {
     const [workspaceRole, grantChain] = await Promise.all([
       this.workspaces.roleOf(document.workspaceId, userId, tx),
-      this.grantChain(documentId, userId, tx),
+      this.grantChain(document.id, userId, tx),
     ]);
-    const access = resolveDocumentAccess({
+    return resolveDocumentAccess({
       workspaceRole,
       grantChain,
       shareLinkLevel: null,
       authenticated: true,
     });
-    if (access === 'NONE') {
-      throw new NotFoundException('Document not found');
-    }
-    return { document, access };
   }
 
   async require(

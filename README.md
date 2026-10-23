@@ -10,6 +10,7 @@ Notion-like collaborative workspace: nested pages, block editor with real-time C
 backend/     NestJS — one codebase, several processes:
                src/main.ts    REST API          :4000
                src/collab.ts  collab gateway    :4001 (Yjs over WebSocket)
+               src/worker.ts  background jobs   (BullMQ: notifications)
              src/infra/   config, health, prisma
              prisma/      schema and migrations
              src/modules/ business modules
@@ -35,6 +36,7 @@ npm run prisma:deploy                # apply migrations
 npm run db:seed                      # demo users and workspace
 npm run start:dev                    # REST API on :4000
 npm run start:collab:dev             # collab gateway on :4001
+npm run start:worker:dev             # background jobs
 
 cd frontend
 npm install
@@ -95,6 +97,20 @@ downgraded to read-only or closed with `4404`.
 **Limitations.** Rooms live in one gateway process. Running several gateway instances requires
 routing all connections of a document to the same instance (or a shared Yjs backend such as
 y-redis).
+
+## Comments and notifications
+
+Comments form threads attached to a block (`blockId` is the editor's stable block id). Reading
+threads needs view access; commenting, replying and resolving need edit access, because viewers are
+read-only. A comment can be deleted by its author or a document manager (soft delete; a thread
+without comments disappears).
+
+Mentions are sent as user ids next to the text. The API accepts only users who can see the
+document, stores the comment and enqueues `mentions.notify` (job id = comment id). The worker
+re-checks access at delivery time and inserts notifications with a unique
+`dedupe_key = mention:<comment>:<user>`, so a retried or duplicated job never creates a second
+notification. Authors are not notified about their own mentions, and notifications of deleted
+documents or comments are hidden.
 
 ## Environment profiles
 

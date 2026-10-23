@@ -23,6 +23,7 @@ export class OriginGuard implements CanActivate {
       {
         method: req.method,
         origin: req.headers.origin,
+        ownOrigin: `${req.protocol}://${req.get('host')}`,
         hasSessionCookie: SESSION_COOKIES.some((name) => cookies[name] !== undefined),
       },
       this.allowedOrigins,
