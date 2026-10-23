@@ -4,10 +4,10 @@ import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-w
 
 @Injectable()
 export class WorkspacesRepository extends PrismaRepository {
-  async lock(workspaceId: string, tx: Transaction): Promise<boolean> {
+  async lockWithPlan(workspaceId: string, tx: Transaction) {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM workspaces WHERE id = ${workspaceId}::uuid FOR UPDATE`;
-    return rows.length === 1;
+    return rows.length === 1 ? this.findWithPlan(workspaceId, tx) : null;
   }
 
   createWithOwner(name: string, ownerId: string, tx: Transaction) {

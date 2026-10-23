@@ -4,10 +4,10 @@ export type DocumentAccess = 'NONE' | 'VIEW' | 'EDIT' | 'MANAGE';
 
 const ORDER: readonly DocumentAccess[] = ['NONE', 'VIEW', 'EDIT', 'MANAGE'];
 
-const atLeast = (access: DocumentAccess, required: DocumentAccess) =>
+export const hasAccess = (access: DocumentAccess, required: DocumentAccess) =>
   ORDER.indexOf(access) >= ORDER.indexOf(required);
 
-const strongest = (a: DocumentAccess, b: DocumentAccess) => (atLeast(a, b) ? a : b);
+const strongest = (a: DocumentAccess, b: DocumentAccess) => (hasAccess(a, b) ? a : b);
 
 export interface DocumentAccessInput {
   workspaceRole: WorkspaceRole | null;
@@ -47,9 +47,9 @@ export function resolveDocumentAccess(input: DocumentAccessInput): DocumentAcces
   return strongest(base, fromLink);
 }
 
-export const canView = (access: DocumentAccess) => atLeast(access, 'VIEW');
-export const canEdit = (access: DocumentAccess) => atLeast(access, 'EDIT');
-export const canManage = (access: DocumentAccess) => atLeast(access, 'MANAGE');
+export const canView = (access: DocumentAccess) => hasAccess(access, 'VIEW');
+export const canEdit = (access: DocumentAccess) => hasAccess(access, 'EDIT');
+export const canManage = (access: DocumentAccess) => hasAccess(access, 'MANAGE');
 
 export function isShareLinkActive(
   link: { revokedAt: Date | null; expiresAt: Date | null },

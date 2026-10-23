@@ -18,5 +18,6 @@ import { WorkspacesService } from './workspaces.service.js';
     WorkspacesRepository,
     InvitationsRepository,
   ],
+  exports: [WorkspacesRepository],
 })
 export class WorkspacesModule {}

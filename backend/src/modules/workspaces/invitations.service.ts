@@ -149,9 +149,7 @@ export class InvitationsService {
   }
 
   private async lockWorkspace(workspaceId: string, tx: Transaction) {
-    const workspace = (await this.workspaces.lock(workspaceId, tx))
-      ? await this.workspaces.findWithPlan(workspaceId, tx)
-      : null;
+    const workspace = await this.workspaces.lockWithPlan(workspaceId, tx);
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
     }
