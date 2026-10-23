@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { CollabEventsService } from '../../infra/collab-events/collab-events.service.js';
 import { UnitOfWork } from '../../infra/prisma/unit-of-work.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
 import { canChangeRole, canRemoveMember } from '../permissions/workspace-roles.js';
@@ -13,6 +14,7 @@ export class MembersService {
     private readonly workspaces: WorkspacesRepository,
     private readonly access: WorkspaceAccessService,
     private readonly uow: UnitOfWork,
+    private readonly collabEvents: CollabEventsService,
   ) {}
 
   async list(userId: string, workspaceId: string): Promise<MemberDto[]> {
@@ -44,6 +46,7 @@ export class MembersService {
       }
       await this.workspaces.updateRole(workspaceId, targetUserId, role, tx);
     });
+    await this.collabEvents.accessChanged(workspaceId);
     this.logger.log({ workspaceId, actorId, targetUserId, role }, 'Member role changed');
   }
 
@@ -63,6 +66,7 @@ export class MembersService {
       }
       await this.workspaces.removeMember(workspaceId, targetUserId, tx);
     });
+    await this.collabEvents.accessChanged(workspaceId);
     this.logger.log({ workspaceId, actorId, targetUserId }, 'Member removed');
   }
 }

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { generateKeyBetween } from 'fractional-indexing';
 import type { Document } from '../../generated/prisma/client.js';
+import { CollabEventsService } from '../../infra/collab-events/collab-events.service.js';
 import { type Transaction, UnitOfWork } from '../../infra/prisma/unit-of-work.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import type { DocumentAccess } from '../permissions/document-access.js';
@@ -41,6 +42,7 @@ export class DocumentsService {
     private readonly users: UsersService,
     private readonly treeCache: TreeCacheService,
     private readonly uow: UnitOfWork,
+    private readonly collabEvents: CollabEventsService,
   ) {}
 
   async tree(userId: string, workspaceId: string): Promise<DocumentNodeDto[]> {
@@ -107,6 +109,7 @@ export class DocumentsService {
       await this.documents.move(documentId, dto.parentId, position, tx);
     });
     await this.treeCache.invalidate(workspaceId);
+    await this.collabEvents.accessChanged(workspaceId);
     this.logger.log({ workspaceId, documentId, parentId: dto.parentId, userId }, 'Document moved');
     return this.get(userId, documentId);
   }
@@ -118,6 +121,7 @@ export class DocumentsService {
       return this.documents.softDeleteSubtree(documentId, new Date(), tx);
     });
     await this.treeCache.invalidate(document.workspaceId);
+    await this.collabEvents.accessChanged(document.workspaceId);
     this.logger.log(
       { workspaceId: document.workspaceId, documentId, deleted, userId },
       'Document deleted',
@@ -136,12 +140,13 @@ export class DocumentsService {
   }
 
   async share(userId: string, documentId: string, dto: ShareDocumentDto) {
-    await this.documentAccess.require(documentId, userId, 'MANAGE');
+    const { document } = await this.documentAccess.require(documentId, userId, 'MANAGE');
     const target = await this.users.findByEmail(dto.email);
     if (!target) {
       throw new NotFoundException('No registered user with this email');
     }
     await this.documents.upsertPermission(documentId, target.id, dto.accessLevel, userId);
+    await this.collabEvents.accessChanged(document.workspaceId);
     this.logger.log(
       { documentId, userId, targetUserId: target.id, accessLevel: dto.accessLevel },
       'Document shared',
@@ -149,10 +154,11 @@ export class DocumentsService {
   }
 
   async unshare(userId: string, documentId: string, targetUserId: string) {
-    await this.documentAccess.require(documentId, userId, 'MANAGE');
+    const { document } = await this.documentAccess.require(documentId, userId, 'MANAGE');
     if (!(await this.documents.deletePermission(documentId, targetUserId))) {
       throw new NotFoundException('Permission not found');
     }
+    await this.collabEvents.accessChanged(document.workspaceId);
   }
 
   private async assertCanPlaceUnder(

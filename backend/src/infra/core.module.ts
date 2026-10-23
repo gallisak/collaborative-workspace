@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CollabEventsModule } from './collab-events/collab-events.module.js';
 import { envFilePaths, validateEnv } from './config/env.schema.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { MailModule } from './mail/mail.module.js';
@@ -18,6 +19,7 @@ import { RedisModule } from './redis/redis.module.js';
     MailModule,
     PrismaModule,
     RedisModule,
+    CollabEventsModule,
   ],
 })
 export class CoreModule {}

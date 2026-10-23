@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { CollabEventsService } from '../../infra/collab-events/collab-events.service.js';
 import { UnitOfWork } from '../../infra/prisma/unit-of-work.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
 import type { WorkspaceDetailsDto, WorkspaceSummaryDto } from './workspaces.dto.js';
@@ -12,6 +13,7 @@ export class WorkspacesService {
     private readonly workspaces: WorkspacesRepository,
     private readonly access: WorkspaceAccessService,
     private readonly uow: UnitOfWork,
+    private readonly collabEvents: CollabEventsService,
   ) {}
 
   async create(userId: string, name: string): Promise<WorkspaceSummaryDto> {
@@ -61,6 +63,7 @@ export class WorkspacesService {
   async remove(userId: string, workspaceId: string) {
     await this.access.requireRole(workspaceId, userId, 'OWNER');
     await this.workspaces.delete(workspaceId);
+    await this.collabEvents.accessChanged(workspaceId);
     this.logger.log({ workspaceId, userId }, 'Workspace deleted');
   }
 }

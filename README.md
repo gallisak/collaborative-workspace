@@ -55,6 +55,39 @@ Health checks: `GET http://localhost:4000/health`, `GET http://localhost:4001/he
 
 API docs: `http://localhost:4000/api/docs`.
 
+## Real-time collaboration
+
+The collab gateway (`backend/src/collab.ts`) speaks the standard y-websocket protocol at
+`ws://<collab-host>/documents/<documentId>`.
+
+**Connection.** The `Origin` must be allowed and the `access_token` cookie valid. Access is
+resolved with the same rules as the REST API. Viewers receive the document and live changes, but
+their own updates are dropped on the server. Presence always carries the authenticated user, and a
+connection can only change its own presence entries.
+
+**Close codes** (the y-websocket client treats 4400–4499 as final and stops reconnecting):
+`4400` malformed message, `4401` not authenticated, `4403` origin not allowed, `4404` no access or
+document deleted, `1012` server restart.
+
+**Persistence.**
+
+1. Every update is applied to the in-memory `Y.Doc` and broadcast to the room.
+2. Updates are buffered and appended to `document_updates` as one merged row every
+   `COLLAB_FLUSH_INTERVAL_MS`.
+3. After `COLLAB_COMPACTION_THRESHOLD` rows, or when the last client leaves, the full state is
+   written to `document_states` together with `last_update_id`, and the covered rows are deleted
+   in the same transaction.
+4. Cold start loads the snapshot and replays rows with `id > last_update_id`. Yjs updates are
+   idempotent, so an update that ends up both in the snapshot and in the log is harmless.
+
+**Access changes.** The API publishes `collab:access-changed` (Redis pub/sub) after member,
+role, sharing, move and delete changes. The gateway re-resolves access for open sessions: they are
+downgraded to read-only or closed with `4404`.
+
+**Limitations.** Rooms live in one gateway process. Running several gateway instances requires
+routing all connections of a document to the same instance (or a shared Yjs backend such as
+y-redis).
+
 ## Environment profiles
 
 - `.env.example` — development (services on `localhost`)

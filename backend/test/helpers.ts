@@ -70,6 +70,7 @@ export async function signUp(app: INestApplication, email = uniqueEmail()) {
   return {
     id: user.id,
     email,
+    cookies,
     get: (path: string) => request(app.getHttpServer()).get(path).set('Cookie', cookies),
     post: (path: string) =>
       request(app.getHttpServer()).post(path).set('Origin', WEB_ORIGIN).set('Cookie', cookies),

@@ -34,6 +34,11 @@ export const envSchema = z
     REFRESH_ROTATION_GRACE_SECONDS: z.coerce.number().int().min(0).max(60).default(10),
 
     INVITATION_TTL: duration('7d'),
+
+    COLLAB_FLUSH_INTERVAL_MS: z.coerce.number().int().min(50).default(1000),
+    COLLAB_COMPACTION_THRESHOLD: z.coerce.number().int().min(1).default(100),
+    COLLAB_MAX_MESSAGE_BYTES: z.coerce.number().int().positive().default(5_000_000),
+    COLLAB_HEARTBEAT_MS: z.coerce.number().int().min(1000).default(30_000),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {

@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { CoreModule } from './infra/core.module.js';
 import { HealthModule } from './infra/health/health.module.js';
+import { CollabGatewayModule } from './modules/collab/collab.module.js';
 
 @Module({
-  imports: [CoreModule, HealthModule],
+  imports: [CoreModule, HealthModule, CollabGatewayModule],
 })
 export class CollabModule {}
