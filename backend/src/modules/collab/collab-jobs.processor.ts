@@ -1,4 +1,4 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Processor } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import {
@@ -7,6 +7,7 @@ import {
   type CreateVersionJob,
   type RestoreVersionJob,
 } from '../../infra/queue/collab-jobs.js';
+import { TracedWorkerHost } from '../../infra/queue/traced-job.js';
 import { restoreContent } from './document-content.js';
 import { RoomsService } from './rooms.service.js';
 import { SnapshotsService } from './snapshots.service.js';
@@ -15,7 +16,7 @@ import { VersionStore } from './version-store.js';
 export const RESTORE_ORIGIN = Symbol('restore');
 
 @Processor(COLLAB_QUEUE)
-export class CollabJobsProcessor extends WorkerHost {
+export class CollabJobsProcessor extends TracedWorkerHost {
   private readonly logger = new Logger(CollabJobsProcessor.name);
 
   constructor(
@@ -26,7 +27,7 @@ export class CollabJobsProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<CreateVersionJob | RestoreVersionJob>) {
+  protected async handle(job: Job<CreateVersionJob | RestoreVersionJob>) {
     const { documentId } = job.data;
     if (!(await this.versions.isActive(documentId))) {
       this.logger.warn({ documentId, job: job.name }, 'Skipping job for a deleted document');

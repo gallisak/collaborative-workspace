@@ -1,17 +1,18 @@
-import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
+import { InjectQueue, Processor } from '@nestjs/bullmq';
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { durationToSeconds } from '../../common/duration.js';
 import type { Env } from '../../infra/config/env.schema.js';
 import { ATTACHMENTS_QUEUE, AttachmentJob } from '../../infra/queue/attachment-jobs.js';
+import { TracedWorkerHost } from '../../infra/queue/traced-job.js';
 import { StorageService } from '../../infra/storage/storage.service.js';
 import { AttachmentsRepository } from './attachments.repository.js';
 
 const BATCH = 500;
 
 @Processor(ATTACHMENTS_QUEUE)
-export class UploadCleanupProcessor extends WorkerHost implements OnApplicationBootstrap {
+export class UploadCleanupProcessor extends TracedWorkerHost implements OnApplicationBootstrap {
   private readonly logger = new Logger(UploadCleanupProcessor.name);
   private readonly uploadWindowMs: number;
   private readonly everyMs: number;
@@ -36,7 +37,7 @@ export class UploadCleanupProcessor extends WorkerHost implements OnApplicationB
     );
   }
 
-  async process() {
+  protected async handle() {
     const abandoned = await this.attachments.findAbandoned(
       new Date(Date.now() - this.uploadWindowMs),
       BATCH,

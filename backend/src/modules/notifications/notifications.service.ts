@@ -6,6 +6,7 @@ import {
   NotificationJob,
   type NotifyMentionsJob,
 } from '../../infra/queue/notification-jobs.js';
+import { traced } from '../../infra/queue/traced-job.js';
 import type { NotificationDto } from './notifications.dto.js';
 import { NotificationsRepository } from './notifications.repository.js';
 
@@ -49,6 +50,6 @@ export class NotificationsService {
 
   async notifyMentions(commentId: string) {
     const job: NotifyMentionsJob = { commentId };
-    await this.queue.add(NotificationJob.NotifyMentions, job, { jobId: commentId });
+    await this.queue.add(NotificationJob.NotifyMentions, traced(job), { jobId: commentId });
   }
 }

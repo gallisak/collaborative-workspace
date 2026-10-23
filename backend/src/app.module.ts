@@ -3,6 +3,7 @@ import { APP_FILTER } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { CoreModule } from './infra/core.module.js';
 import { HealthModule } from './infra/health/health.module.js';
+import { MetricsModule } from './infra/metrics/metrics.module.js';
 import { ThrottlingModule } from './infra/throttling/throttling.module.js';
 import { AttachmentsModule } from './modules/attachments/attachments.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -20,6 +21,7 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module.js';
 @Module({
   imports: [
     CoreModule,
+    MetricsModule.forService('api'),
     HealthModule,
     UsersModule,
     AuthModule,

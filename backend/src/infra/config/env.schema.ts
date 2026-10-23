@@ -18,6 +18,7 @@ export const envSchema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     API_PORT: z.coerce.number().int().positive().default(4000),
     COLLAB_PORT: z.coerce.number().int().positive().default(4001),
+    WORKER_PORT: z.coerce.number().int().positive().default(4002),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),

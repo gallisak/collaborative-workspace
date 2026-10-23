@@ -9,6 +9,7 @@ import {
   PublishingJob,
   type RevalidatePageJob,
 } from '../../infra/queue/publishing-jobs.js';
+import { traced } from '../../infra/queue/traced-job.js';
 
 @Injectable()
 export class PageRevalidationService {
@@ -43,7 +44,7 @@ export class PageRevalidationService {
 
   async schedule(documentId: string) {
     const job: RevalidatePageJob = { documentId };
-    await this.queue.add(PublishingJob.RevalidatePage, job, {
+    await this.queue.add(PublishingJob.RevalidatePage, traced(job), {
       delay: this.delayMs,
       deduplication: { id: documentId, ttl: this.delayMs },
     });
@@ -51,7 +52,7 @@ export class PageRevalidationService {
 
   async scheduleAt(documentId: string, at: Date) {
     const job: RevalidatePageJob = { documentId };
-    await this.queue.add(PublishingJob.RevalidatePage, job, {
+    await this.queue.add(PublishingJob.RevalidatePage, traced(job), {
       delay: Math.max(0, at.getTime() - Date.now()),
     });
   }

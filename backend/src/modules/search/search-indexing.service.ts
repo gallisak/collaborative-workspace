@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { Env } from '../../infra/config/env.schema.js';
 import { type IndexDocumentJob, SEARCH_QUEUE, SearchJob } from '../../infra/queue/search-jobs.js';
+import { traced } from '../../infra/queue/traced-job.js';
 
 @Injectable()
 export class SearchIndexingService {
@@ -22,7 +23,7 @@ export class SearchIndexingService {
       await Promise.all(
         documentIds.map((documentId) => {
           const job: IndexDocumentJob = { documentId };
-          return this.queue.add(SearchJob.IndexDocument, job, {
+          return this.queue.add(SearchJob.IndexDocument, traced(job), {
             delay: this.delayMs,
             deduplication: { id: documentId, keepLastIfActive: true },
           });

@@ -7,6 +7,7 @@ import {
   type CreateVersionJob,
   type RestoreVersionJob,
 } from '../../infra/queue/collab-jobs.js';
+import { traced } from '../../infra/queue/traced-job.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import type { VersionDetailsDto, VersionDto } from './versions.dto.js';
 import { VersionsRepository } from './versions.repository.js';
@@ -43,7 +44,7 @@ export class VersionsService {
       userId,
       name: name ?? null,
     };
-    await this.queue.add(CollabJob.CreateVersion, job);
+    await this.queue.add(CollabJob.CreateVersion, traced(job));
     this.logger.log({ documentId, userId }, 'Version requested');
   }
 
@@ -58,7 +59,7 @@ export class VersionsService {
       userId,
       versionId,
     };
-    await this.queue.add(CollabJob.RestoreVersion, job);
+    await this.queue.add(CollabJob.RestoreVersion, traced(job));
     this.logger.log({ documentId, versionId, userId }, 'Version restore requested');
   }
 }

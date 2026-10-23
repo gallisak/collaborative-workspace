@@ -5,6 +5,7 @@ import { PageRevalidationModule } from '../publishing/page-revalidation.module.j
 import { SearchIndexingModule } from '../search/search-indexing.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { CollabGateway } from './collab.gateway.js';
+import { CollabMetrics } from './collab-metrics.js';
 import { CollabJobsProcessor } from './collab-jobs.processor.js';
 import { DocumentStore } from './document-store.js';
 import { RoomsService } from './rooms.service.js';
@@ -26,6 +27,7 @@ import { VersionStore } from './version-store.js';
     SnapshotsService,
     VersionStore,
     CollabJobsProcessor,
+    CollabMetrics,
   ],
 })
 export class CollabGatewayModule {}

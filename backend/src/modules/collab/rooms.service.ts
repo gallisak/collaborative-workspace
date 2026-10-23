@@ -59,6 +59,14 @@ export class RoomsService {
     }
   }
 
+  stats() {
+    const rooms = [...this.loaded.values()];
+    return {
+      rooms: rooms.length,
+      connections: rooms.reduce((sum, room) => sum + room.clients.size, 0),
+    };
+  }
+
   inWorkspace(workspaceId: string): Room[] {
     return [...this.loaded.values()].filter((room) => room.workspaceId === workspaceId);
   }

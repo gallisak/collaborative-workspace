@@ -4,11 +4,13 @@ import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { Env } from '../../infra/config/env.schema.js';
+import { MetricsService } from '../../infra/metrics/metrics.service.js';
 import {
   BILLING_QUEUE,
   BillingJob,
   type ProcessBillingEventJob,
 } from '../../infra/queue/billing-jobs.js';
+import { traced } from '../../infra/queue/traced-job.js';
 import { billingEventSchema } from './billing-event.js';
 import { BillingRepository } from './billing.repository.js';
 import { verifySignature } from './webhook-signature.js';
@@ -21,6 +23,7 @@ export class BillingWebhookService {
   constructor(
     private readonly billing: BillingRepository,
     @InjectQueue(BILLING_QUEUE) private readonly queue: Queue,
+    private readonly metrics: MetricsService,
     config: ConfigService<Env, true>,
   ) {
     this.secret = config.get('BILLING_WEBHOOK_SECRET', { infer: true });
@@ -29,6 +32,7 @@ export class BillingWebhookService {
   async receive(rawBody: Buffer | undefined, signature: string | undefined) {
     const payload = rawBody?.toString('utf8') ?? '';
     if (!verifySignature(this.secret, payload, signature, Math.floor(Date.now() / 1000))) {
+      this.metrics.webhookDeliveries.inc({ outcome: 'rejected' });
       this.logger.warn('Rejected a billing webhook with an invalid signature');
       throw new BadRequestException('Invalid signature');
     }
@@ -39,6 +43,7 @@ export class BillingWebhookService {
       payload: json,
       occurredAt: new Date(event.created * 1000),
     });
+    this.metrics.webhookDeliveries.inc({ outcome: duplicate ? 'duplicate' : 'accepted' });
     if (duplicate) {
       this.logger.warn(
         { eventId: event.id, type: event.type, processed: processedAt !== null },
@@ -49,7 +54,9 @@ export class BillingWebhookService {
     }
     if (!processedAt) {
       const job: ProcessBillingEventJob = { eventId: event.id };
-      await this.queue.add(BillingJob.ProcessEvent, job, { deduplication: { id: event.id } });
+      await this.queue.add(BillingJob.ProcessEvent, traced(job), {
+        deduplication: { id: event.id },
+      });
     }
   }
 

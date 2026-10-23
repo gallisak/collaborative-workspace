@@ -1,10 +1,11 @@
-import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
+import { InjectQueue, Processor } from '@nestjs/bullmq';
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Job, Queue } from 'bullmq';
 import * as Y from 'yjs';
 import type { Env } from '../../infra/config/env.schema.js';
 import { type IndexDocumentJob, SEARCH_QUEUE, SearchJob } from '../../infra/queue/search-jobs.js';
+import { TracedWorkerHost } from '../../infra/queue/traced-job.js';
 import { CONTENT_FIELD } from '../collab/document-content.js';
 import { DocumentStore } from '../collab/document-store.js';
 import { documentText } from './document-text.js';
@@ -14,7 +15,7 @@ import { SearchRepository } from './search.repository.js';
 const RECONCILE_BATCH = 500;
 
 @Processor(SEARCH_QUEUE)
-export class SearchIndexProcessor extends WorkerHost implements OnApplicationBootstrap {
+export class SearchIndexProcessor extends TracedWorkerHost implements OnApplicationBootstrap {
   private readonly logger = new Logger(SearchIndexProcessor.name);
   private readonly reconcileEveryMs: number;
 
@@ -37,7 +38,7 @@ export class SearchIndexProcessor extends WorkerHost implements OnApplicationBoo
     );
   }
 
-  async process(job: Job<IndexDocumentJob>) {
+  protected async handle(job: Job<IndexDocumentJob>) {
     switch (job.name) {
       case SearchJob.IndexDocument:
         return this.index(job.data.documentId);

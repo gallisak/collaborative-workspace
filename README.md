@@ -10,7 +10,7 @@ Notion-like collaborative workspace: nested pages, block editor with real-time C
 backend/     NestJS — one codebase, several processes:
                src/main.ts    REST API          :4000
                src/collab.ts  collab gateway    :4001 (Yjs over WebSocket)
-               src/worker.ts  background jobs   (BullMQ: notifications, search indexing, page revalidation, billing events, upload cleanup)
+               src/worker.ts  background jobs   :4002 (BullMQ: notifications, search indexing, page revalidation, billing events, upload cleanup)
              src/infra/   config, health, prisma
              prisma/      schema and migrations
              src/modules/ business modules
@@ -43,7 +43,8 @@ npm install
 npm run dev                          # :3000
 ```
 
-Health checks: `GET http://localhost:4000/health`, `GET http://localhost:4001/health`.
+Health checks on every process (`:4000`, `:4001`, `:4002`): `GET /health` (alive) and `GET /health/ready`
+(database and Redis reachable, `503` otherwise). Prometheus metrics: `GET /metrics`.
 
 ## Demo data
 
@@ -216,6 +217,28 @@ removes uploads that were never completed, together with their objects. Two S3 c
 one talks to MinIO from the backend (`S3_ENDPOINT`), the other only signs URLs for the browser
 (`S3_PUBLIC_ENDPOINT`), because the signature covers the host. MinIO allows CORS only from the
 frontend origin.
+
+## Observability
+
+**Logs** are structured JSON (pino). Every HTTP request gets a correlation id (taken from
+`X-Correlation-Id` or generated) that is returned in the response header and attached to every log
+line of the request together with the user id. Background jobs carry the correlation id of the
+request that enqueued them and the worker restores it, so one id links the whole chain, for
+example webhook delivery → `billing` queue → "Workspace plan changed" in the worker. Key events
+are logged explicitly: document published, share link revoked, workspace plan changed, duplicate
+billing webhook delivery, rejected webhook signature.
+
+**Metrics** (`/metrics`, labelled with `service` = `api`, `collab` or `worker`):
+
+- `http_request_duration_seconds` by method, route template (never raw ids) and status;
+- `collab_connections` and `collab_open_documents`;
+- `queue_jobs` by queue and state (waiting, delayed, active, failed);
+- `documents_published_total`, `billing_plan_changes_total`,
+  `billing_webhook_deliveries_total{outcome="accepted|duplicate|rejected"}`;
+- default Node.js process metrics (memory, CPU, event loop lag, GC).
+
+`/metrics` has no authentication and is meant to be scraped on the internal network only; it is
+not routed through the public `/api` prefix.
 
 ## Environment profiles
 

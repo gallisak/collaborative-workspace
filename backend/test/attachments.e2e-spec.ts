@@ -1,5 +1,6 @@
 import { CreateBucketCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import type { INestApplication } from '@nestjs/common';
+import type { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { MailService } from '../src/infra/mail/mail.service.js';
@@ -211,7 +212,7 @@ describe('Attachments (e2e)', () => {
     });
 
     await owner.post(`/api/attachments/${created.attachment.id}/complete`).expect(400);
-    await worker.get(UploadCleanupProcessor).process();
+    await worker.get(UploadCleanupProcessor).process({} as Job);
 
     expect(await prisma.attachment.count({ where: { id: created.attachment.id } })).toBe(0);
   });

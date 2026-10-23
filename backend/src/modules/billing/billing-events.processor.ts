@@ -1,8 +1,10 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Processor } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { BILLING_QUEUE, type ProcessBillingEventJob } from '../../infra/queue/billing-jobs.js';
 import { UnitOfWork } from '../../infra/prisma/unit-of-work.js';
+import { MetricsService } from '../../infra/metrics/metrics.service.js';
+import { BILLING_QUEUE, type ProcessBillingEventJob } from '../../infra/queue/billing-jobs.js';
+import { TracedWorkerHost } from '../../infra/queue/traced-job.js';
 import {
   CHECKOUT_COMPLETED,
   checkoutCompletedSchema,
@@ -11,17 +13,18 @@ import {
 import { BillingRepository } from './billing.repository.js';
 
 @Processor(BILLING_QUEUE)
-export class BillingEventsProcessor extends WorkerHost {
+export class BillingEventsProcessor extends TracedWorkerHost {
   private readonly logger = new Logger(BillingEventsProcessor.name);
 
   constructor(
     private readonly billing: BillingRepository,
     private readonly uow: UnitOfWork,
+    private readonly metrics: MetricsService,
   ) {
     super();
   }
 
-  async process({ data: { eventId } }: Job<ProcessBillingEventJob>) {
+  protected async handle({ data: { eventId } }: Job<ProcessBillingEventJob>) {
     await this.uow.run(async (tx) => {
       const event = await this.billing.lockEvent(eventId, tx);
       if (!event) {
@@ -62,6 +65,7 @@ export class BillingEventsProcessor extends WorkerHost {
       }
       await this.billing.activate(parsed.data.id, decision, tx);
       await this.billing.markProcessed(eventId, tx);
+      this.metrics.planChanges.inc({ from: previousPlan, to: decision.planId });
       this.logger.log(
         { eventId, workspaceId: decision.workspaceId, from: previousPlan, to: decision.planId },
         'Workspace plan changed',

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { CollabEventsService } from '../../infra/collab-events/collab-events.service.js';
+import { MetricsService } from '../../infra/metrics/metrics.service.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import { PageRevalidationService } from './page-revalidation.service.js';
 import type { CreateShareLinkDto, ShareLinkDto } from './publishing.dto.js';
@@ -17,6 +18,7 @@ export class ShareLinksService {
     private readonly documentAccess: DocumentAccessService,
     private readonly pages: PageRevalidationService,
     private readonly collabEvents: CollabEventsService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async create(userId: string, documentId: string, dto: CreateShareLinkDto): Promise<ShareLinkDto> {
@@ -35,6 +37,7 @@ export class ShareLinksService {
     if (expiresAt) {
       await this.pages.scheduleAt(documentId, expiresAt);
     }
+    this.metrics.documentsPublished.inc({ access_level: link.accessLevel });
     this.logger.log(
       {
         workspaceId: document.workspaceId,

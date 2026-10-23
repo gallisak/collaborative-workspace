@@ -9,6 +9,8 @@ import { API_PREFIX } from './common/api-prefix.js';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from './common/auth/auth-cookies.js';
 import { CORRELATION_HEADER } from './common/correlation.js';
 import type { Env } from './infra/config/env.schema.js';
+import { httpMetrics } from './infra/metrics/http-metrics.js';
+import { MetricsService } from './infra/metrics/metrics.service.js';
 
 export function setupApp(app: INestApplication) {
   const config = app.get<ConfigService<Env, true>>(ConfigService);
@@ -18,7 +20,8 @@ export function setupApp(app: INestApplication) {
   if (trustProxy > 0) {
     (app.getHttpAdapter().getInstance() as Application).set('trust proxy', trustProxy);
   }
-  app.setGlobalPrefix(API_PREFIX, { exclude: ['health'] });
+  app.use(httpMetrics(app.get(MetricsService)));
+  app.setGlobalPrefix(API_PREFIX, { exclude: ['health', 'health/ready', 'metrics'] });
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({
