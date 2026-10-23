@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PermissionsModule } from '../permissions/permissions.module.js';
 import { PageRevalidationModule } from '../publishing/page-revalidation.module.js';
+import { SearchIndexingModule } from '../search/search-indexing.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { WorkspacesModule } from '../workspaces/workspaces.module.js';
 import { DocumentsController, WorkspaceDocumentsController } from './documents.controller.js';
@@ -9,7 +10,13 @@ import { DocumentsService } from './documents.service.js';
 import { TreeCacheService } from './tree-cache.service.js';
 
 @Module({
-  imports: [PermissionsModule, UsersModule, WorkspacesModule, PageRevalidationModule],
+  imports: [
+    PermissionsModule,
+    UsersModule,
+    WorkspacesModule,
+    PageRevalidationModule,
+    SearchIndexingModule,
+  ],
   controllers: [WorkspaceDocumentsController, DocumentsController],
   providers: [DocumentsService, DocumentsRepository, TreeCacheService],
 })

@@ -50,6 +50,9 @@ export const envSchema = z
     REVALIDATE_URL: z.url().default('http://localhost:3000/internal/revalidate'),
     REVALIDATE_SECRET: z.string().min(16),
     REVALIDATE_DELAY_MS: z.coerce.number().int().min(100).default(5000),
+
+    SEARCH_INDEX_DELAY_MS: z.coerce.number().int().min(0).default(2000),
+    SEARCH_RECONCILE_INTERVAL_MS: z.coerce.number().int().min(1000).default(600_000),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {

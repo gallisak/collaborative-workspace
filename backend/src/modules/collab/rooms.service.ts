@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as Y from 'yjs';
 import type { Env } from '../../infra/config/env.schema.js';
 import { PageRevalidationService } from '../publishing/page-revalidation.service.js';
+import { SearchIndexingService } from '../search/search-indexing.service.js';
 import { DocumentStore } from './document-store.js';
 import { CloseCode } from './protocol.js';
 import { type CollabClient, LOAD_ORIGIN, Room } from './room.js';
@@ -20,6 +21,7 @@ export class RoomsService {
     private readonly store: DocumentStore,
     private readonly snapshots: SnapshotsService,
     private readonly pages: PageRevalidationService,
+    private readonly search: SearchIndexingService,
     config: ConfigService<Env, true>,
   ) {
     this.options = {
@@ -119,6 +121,7 @@ export class RoomsService {
           () => this.evict(documentId),
           async () => {
             await this.snapshots.takeIfDue(room);
+            await this.search.schedule([documentId]);
             await this.pages.scheduleIfPublished([documentId]);
           },
         ),

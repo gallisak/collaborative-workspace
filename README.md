@@ -10,7 +10,7 @@ Notion-like collaborative workspace: nested pages, block editor with real-time C
 backend/     NestJS — one codebase, several processes:
                src/main.ts    REST API          :4000
                src/collab.ts  collab gateway    :4001 (Yjs over WebSocket)
-               src/worker.ts  background jobs   (BullMQ: notifications, page revalidation)
+               src/worker.ts  background jobs   (BullMQ: notifications, search indexing, page revalidation)
              src/infra/   config, health, prisma
              prisma/      schema and migrations
              src/modules/ business modules
@@ -134,6 +134,37 @@ type, and editing is never blocked by it. The worker calls `REVALIDATE_URL` with
 `REVALIDATE_SECRET` and retries with backoff if the frontend is unavailable. Renames, deletion,
 revoking and expiry of a link revalidate the page too. Visitors may see content up to a few seconds
 old (eventual consistency); local edits that have not reached the server yet are not published.
+
+## Search
+
+**Why Postgres full-text search, not Meilisearch.** At this scale (thousands of documents per
+workspace) a GIN index over `tsvector` answers in milliseconds, and the access check runs in the
+same SQL query against the same transactional data. That way a document someone just lost access
+to can never appear in results, whereas with an external engine the access rules would have to be
+copied into it and kept in sync. It is also one service less to run. Meilisearch would pay off with
+typo tolerance or much larger volumes.
+
+**Query.** `GET /api/workspaces/:id/search?q=` splits the input into words (any alphabet) and
+builds a prefix query (`word:*`, all words must match). The input never reaches `tsquery` syntax
+unescaped. The `simple` configuration is used because content is multilingual (Ukrainian and
+English) and Postgres has no Ukrainian stemmer; prefix matching covers most word forms. Titles
+have a higher weight than the body. Workspace members see all documents; guests see only pages
+shared with them and their subpages, the same rule the permission resolver applies.
+
+**Indexing is asynchronous.** Saving content (collab gateway), creating and renaming a document
+enqueue `document.index`. The worker loads the current Y.Doc, extracts plain text and upserts
+`document_search`. Jobs carry only the document id and always read the latest state, so a repeated
+or late job is harmless. A deduplication key per document keeps at most one waiting and one
+running job, which also stops a burst of typing from producing a job per keystroke. The upsert is
+guarded by `indexed_update_id`, so a result computed from an older state never overwrites a newer
+one.
+
+**Consistency.** The index is eventually consistent: results lag edits by about
+`SEARCH_INDEX_DELAY_MS` plus processing time. Access rights and deletion are always strongly
+consistent because they are checked against the live tables at query time. A repeatable
+`index.reconcile` job (`SEARCH_RECONCILE_INTERVAL_MS`) re-enqueues documents whose index is missing
+or older than their content or title, so a lost job (for example while Redis was down) and the
+seeded demo documents are indexed too.
 
 ## Environment profiles
 

@@ -7,6 +7,7 @@ import { redisConnectionFromUrl } from '../redis/redis-url.js';
 import { COLLAB_QUEUE } from './collab-jobs.js';
 import { NOTIFICATIONS_QUEUE } from './notification-jobs.js';
 import { PUBLISHING_QUEUE } from './publishing-jobs.js';
+import { SEARCH_QUEUE } from './search-jobs.js';
 
 const defaultJobOptions: DefaultJobOptions = {
   attempts: 5,
@@ -19,6 +20,7 @@ const queues = BullModule.registerQueue(
   { name: COLLAB_QUEUE, defaultJobOptions },
   { name: NOTIFICATIONS_QUEUE, defaultJobOptions },
   { name: PUBLISHING_QUEUE, defaultJobOptions },
+  { name: SEARCH_QUEUE, defaultJobOptions },
 );
 
 @Global()

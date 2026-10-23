@@ -6,6 +6,7 @@ import { type Transaction, UnitOfWork } from '../../infra/prisma/unit-of-work.js
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import type { DocumentAccess } from '../permissions/document-access.js';
 import { PageRevalidationService } from '../publishing/page-revalidation.service.js';
+import { SearchIndexingService } from '../search/search-indexing.service.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
 import { UsersService } from '../users/users.service.js';
 import { assertCapacity } from '../workspaces/plan-limits.js';
@@ -45,6 +46,7 @@ export class DocumentsService {
     private readonly uow: UnitOfWork,
     private readonly collabEvents: CollabEventsService,
     private readonly pages: PageRevalidationService,
+    private readonly search: SearchIndexingService,
   ) {}
 
   async tree(userId: string, workspaceId: string): Promise<DocumentNodeDto[]> {
@@ -77,6 +79,7 @@ export class DocumentsService {
       );
     });
     await this.treeCache.invalidate(workspaceId);
+    await this.search.schedule([document.id]);
     this.logger.log({ workspaceId, documentId: document.id, userId }, 'Document created');
     return this.get(userId, document.id);
   }
@@ -85,6 +88,7 @@ export class DocumentsService {
     const { document } = await this.documentAccess.require(documentId, userId, 'EDIT');
     await this.documents.rename(documentId, title);
     await this.treeCache.invalidate(document.workspaceId);
+    await this.search.schedule([documentId]);
     await this.pages.scheduleIfPublished([documentId]);
     return this.get(userId, documentId);
   }
