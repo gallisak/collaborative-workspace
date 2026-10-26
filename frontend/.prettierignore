@@ -1,2 +1,5 @@
 .next/
 next-env.d.ts
+src/shared/api/schema.ts
+test-results/
+playwright-report/

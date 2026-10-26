@@ -12,5 +12,14 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'coverage/**', 'next-env.d.ts']),
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'build/**',
+    'coverage/**',
+    'test-results/**',
+    'playwright-report/**',
+    'next-env.d.ts',
+    'src/shared/api/schema.ts',
+  ]),
 ]);
