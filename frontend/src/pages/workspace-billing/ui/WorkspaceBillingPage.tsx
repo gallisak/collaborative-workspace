@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import { Suspense } from 'react';
-import { formatBytes, formatLimit, formatPrice, usageShare } from '@/entities/plan';
+import { formatBytes, formatLimit, formatPrice, SeatsMeter, UsageMeter } from '@/entities/plan';
 import { canManageBilling } from '@/entities/workspace';
 import { UpgradeButton } from '@/features/change-plan';
 import type { Plan } from '@/shared/api';
@@ -15,46 +15,6 @@ interface WorkspaceBillingPageProps {
 }
 
 const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' });
-
-function UsageMeter({
-  label,
-  used,
-  limit,
-  note,
-  format = String,
-}: {
-  label: string;
-  used: number;
-  limit: number | null;
-  note?: string;
-  format?: (value: number) => string;
-}) {
-  const share = usageShare(used, limit);
-  return (
-    <div className="grid gap-1.5">
-      <div className="flex justify-between text-sm">
-        <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground">
-          {format(used)} of {formatLimit(limit, format)}
-        </span>
-      </div>
-      <div
-        role="meter"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={share}
-        className="bg-muted h-2 overflow-hidden rounded-full"
-      >
-        <div
-          className={cn('h-full rounded-full', share >= 100 ? 'bg-destructive' : 'bg-primary')}
-          style={{ width: `${share}%` }}
-        />
-      </div>
-      {note && <p className="text-muted-foreground text-xs">{note}</p>}
-    </div>
-  );
-}
 
 const planFeatures = (plan: Plan) => [
   `${formatLimit(plan.maxMembers)} members`,
@@ -85,16 +45,7 @@ async function Billing({ params }: WorkspaceBillingPageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <UsageMeter
-            label="Members"
-            used={usage.members + usage.pendingInvitations}
-            limit={plan.maxMembers}
-            note={
-              usage.pendingInvitations > 0
-                ? `Includes ${usage.pendingInvitations} pending ${usage.pendingInvitations === 1 ? 'invitation' : 'invitations'}`
-                : undefined
-            }
-          />
+          <SeatsMeter usage={usage} limit={plan.maxMembers} />
           <UsageMeter label="Documents" used={usage.documents} limit={plan.maxDocuments} />
           <UsageMeter
             label="Storage"
