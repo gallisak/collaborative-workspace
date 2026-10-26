@@ -20,6 +20,7 @@ if (existsSync(rootEnv)) {
 const apiUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,

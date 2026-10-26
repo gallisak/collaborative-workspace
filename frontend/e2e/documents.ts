@@ -51,11 +51,18 @@ export async function share(
 
 export const editor = (page: Page) => page.getByRole('textbox', { name: 'Document content' });
 
+export const documentText = (page: Page) =>
+  editor(page).evaluate((element) => {
+    const copy = element.cloneNode(true) as HTMLElement;
+    copy.querySelectorAll('.collaboration-carets__caret').forEach((caret) => caret.remove());
+    return copy.textContent ?? '';
+  });
+
 export const connection = (page: Page) =>
   page.getByRole('status').filter({ hasText: /Saved|Connecting|Offline|No access/ });
 
-export async function openEditor(page: Page, url: string) {
+export async function openEditor(page: Page, url: string, { writable = true } = {}) {
   await page.goto(url);
   await expect(connection(page)).toHaveText('Saved');
-  await expect(editor(page)).toBeVisible();
+  await expect(editor(page)).toHaveAttribute('contenteditable', String(writable));
 }

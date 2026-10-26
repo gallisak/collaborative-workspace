@@ -1,6 +1,7 @@
 import {
   connection as status,
   createDocument,
+  documentText,
   editor,
   openEditor,
   openSession,
@@ -72,8 +73,8 @@ test.describe('document editor', () => {
     await guest.page.keyboard.type('Hi from Bob.');
 
     for (const { page } of [owner, guest]) {
-      await expect(editor(page)).toContainText('Hello from Ann.');
-      await expect(editor(page)).toContainText('Hi from Bob.');
+      await expect.poll(() => documentText(page)).toContain('Hello from Ann.');
+      await expect.poll(() => documentText(page)).toContain('Hi from Bob.');
     }
     await expect(owner.page.getByRole('list', { name: 'People editing now' })).toContainText(
       'Bob Guest',
@@ -92,7 +93,7 @@ test.describe('document editor', () => {
     const { url, documentId } = await createDocument(owner, baseURL!, 'Read only');
     await share(owner, baseURL!, documentId, viewer.email, 'VIEW');
     await openEditor(owner.page, url);
-    await openEditor(viewer.page, url);
+    await openEditor(viewer.page, url, { writable: false });
 
     await expect(editor(viewer.page)).toHaveAttribute('contenteditable', 'false');
     await expect(viewer.page.getByRole('toolbar', { name: 'Formatting' })).toHaveCount(0);
@@ -100,7 +101,7 @@ test.describe('document editor', () => {
 
     await editor(owner.page).click();
     await owner.page.keyboard.type('Visible to the viewer');
-    await expect(editor(viewer.page)).toContainText('Visible to the viewer');
+    await expect.poll(() => documentText(viewer.page)).toContain('Visible to the viewer');
 
     await editor(viewer.page).click();
     await viewer.page.keyboard.type('should not appear');
@@ -126,7 +127,7 @@ test.describe('document editor', () => {
 
     await owner.context.setOffline(false);
     await expect(status(owner.page)).toHaveText('Saved', { timeout: 15_000 });
-    await expect(editor(guest.page)).toContainText('Written while offline');
+    await expect.poll(() => documentText(guest.page)).toContain('Written while offline');
     await owner.context.close();
     await guest.context.close();
   });

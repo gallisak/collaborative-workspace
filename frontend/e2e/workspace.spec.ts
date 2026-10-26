@@ -71,7 +71,7 @@ test.describe('workspace', () => {
     await expect(treeItem(page, 'Beta')).toHaveAttribute('aria-level', '2');
 
     await page.reload();
-    expect(await titles(page)).toEqual(['Gamma', 'Alpha', 'Beta']);
+    await expect.poll(() => titles(page)).toEqual(['Gamma', 'Alpha', 'Beta']);
     await expect(treeItem(page, 'Beta')).toHaveAttribute('aria-level', '2');
   });
 

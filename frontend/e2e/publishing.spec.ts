@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test';
-import { connection, createDocument, editor, openEditor, openSession } from './documents';
+import {
+  connection,
+  createDocument,
+  documentText,
+  editor,
+  openEditor,
+  openSession,
+} from './documents';
 import { expect, test } from './fixtures';
 
 const REVALIDATION_TIMEOUT = 30_000;
@@ -94,7 +101,7 @@ test.describe('publishing', () => {
     await editor(guest.page).click();
     await guest.page.keyboard.type('Written by a guest');
 
-    await expect(editor(owner.page)).toContainText('Written by a guest');
+    await expect.poll(() => documentText(owner.page)).toContain('Written by a guest');
     await expect(
       owner.page.locator('.collaboration-carets__label', { hasText: 'Guest Editor' }),
     ).toBeVisible();

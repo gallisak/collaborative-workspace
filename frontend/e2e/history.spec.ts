@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { createDocument, editor, openEditor, openSession, share } from './documents';
+import { createDocument, documentText, editor, openEditor, openSession, share } from './documents';
 import { expect, test } from './fixtures';
 
 const history = (page: Page) => page.getByRole('region', { name: 'Version history' });
@@ -28,7 +28,7 @@ test.describe('version history', () => {
     await editor(page).click();
     await page.keyboard.press('ControlOrMeta+End');
     await page.keyboard.type(' plus later changes');
-    await expect(editor(guest.page)).toContainText('plus later changes');
+    await expect.poll(() => documentText(guest.page)).toContain('plus later changes');
 
     await history(page)
       .getByRole('button', { name: /Draft 1/ })
@@ -60,7 +60,7 @@ test.describe('version history', () => {
     await history(owner.page).getByRole('button', { name: 'Save version' }).click();
     await expect(history(owner.page).getByRole('listitem')).toHaveCount(1);
 
-    await openEditor(viewer.page, url);
+    await openEditor(viewer.page, url, { writable: false });
     await viewer.page.getByRole('button', { name: 'History', exact: true }).click();
     await history(viewer.page)
       .getByRole('button', { name: /Saved version/ })

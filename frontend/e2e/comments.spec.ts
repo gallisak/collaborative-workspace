@@ -94,7 +94,7 @@ test.describe('comments and mentions', () => {
     await panel(owner.page).getByRole('button', { name: 'Comment', exact: true }).click();
     await expect(panel(owner.page).getByRole('article')).toBeVisible();
 
-    await openEditor(viewer.page, url);
+    await openEditor(viewer.page, url, { writable: false });
     await viewer.page.getByRole('button', { name: 'Comments (1)' }).click();
     await expect(panel(viewer.page).getByRole('article')).toContainText('Visible to all');
     await expect(panel(viewer.page).getByRole('button', { name: 'Reply' })).toHaveCount(0);

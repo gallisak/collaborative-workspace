@@ -2,7 +2,7 @@
 
 Notion-like collaborative workspace: nested pages, block editor with real-time CRDT editing (Yjs), public SSR/ISR pages, search, mock billing.
 
-> Work in progress. Architecture notes will be expanded as stages land.
+Stack: Next.js 16 (App Router, Cache Components) · NestJS · Yjs · PostgreSQL + Prisma · Redis + BullMQ · MinIO · Docker.
 
 ## Structure
 
@@ -29,14 +29,21 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Open `http://localhost:3000` and sign in with a [demo account](#demo-data).
+
 This starts Postgres, Redis and MinIO, applies migrations and seeds demo data (one-shot `migrate`
 container, `SEED_DEMO_DATA=false` to skip), then runs `api` (:4000), `collab` (:4001) and
-`worker` (:4002) from one backend image. The image is a multi-stage build: `build` compiles,
-`migrate` keeps the Prisma CLI, `runtime` contains only production dependencies and the compiled
-code and runs as the unprivileged `node` user. Every service has a healthcheck on
-`/health/ready`; backend services start only after migrations succeeded and the bucket exists.
+`worker` (:4002) from one backend image and `web` (:3000) from the frontend image. The backend
+image is a multi-stage build: `build` compiles, `migrate` keeps the Prisma CLI, `runtime` contains
+only production dependencies and the compiled code. The frontend image is a Next.js standalone
+build. All images run as the unprivileged `node` user. Every service has a healthcheck; services
+start only after their dependencies are healthy, migrations succeeded and the bucket exists.
 Containers run with `NODE_ENV=development` by default so that the example secrets are accepted;
 production requires real secrets (see [Environment profiles](#environment-profiles)).
+
+Addresses inside the compose network are fixed (`http://api:4000`, `http://web:3000`), addresses the
+browser uses (`FRONTEND_URL`, `NEXT_PUBLIC_COLLAB_URL`, `S3_PUBLIC_ENDPOINT`) come from `.env`.
+`NEXT_PUBLIC_COLLAB_URL` is inlined into the client bundle, so it is a build argument of the image.
 
 ## Local development
 
@@ -73,6 +80,63 @@ Health checks on every process (`:4000`, `:4001`, `:4002`): `GET /health` (alive
 | `cara@collab.local` | Viewer |
 
 API docs: `http://localhost:4000/api/docs`.
+
+## Frontend: Server and Client Components
+
+**The rule.** Everything is a Server Component unless it needs the browser: local state, event
+handlers, a live connection or browser APIs. Data for the first paint is loaded on the server and
+handed to Client Components as typed, serializable props (types are generated from the OpenAPI
+schema, so there is no `any` on the boundary). Client Components are leaves: they never fetch the
+data a page is built from, only what changes while the user works.
+
+| Server Components                                            | Client Components                                              |
+| ------------------------------------------------------------ | -------------------------------------------------------------- |
+| public page `/p/:token` (ISR, no client code of its own)     | block editor: Yjs, WebSocket, presence, offline indicator      |
+| page loaders: document access, members, share links, billing | document tree with drag & drop                                 |
+| settings, billing, search results, checkout summary          | comments, mentions, version history (they poll)                |
+| dashboard sections, streamed independently                   | forms (`useActionState`), share menu, image upload, pay button |
+| layouts and the navigation shell                             | notifications bell                                             |
+
+**Next.js primitives and why.**
+
+- **Cache Components + ISR for public pages.** `getPublicDocument` is a `'use cache'` function
+  tagged `public-document:<id>` with `cacheLife('days')` as a safety net. After the first visit
+  the page is served from the ISR cache (`x-nextjs-cache: HIT`). Changes do not wait for the
+  timer: the worker calls `POST /internal/revalidate` (Bearer `REVALIDATE_SECRET`, compared in
+  constant time), which runs `revalidateTag(tag, { expire: 0 })`, so the next visitor gets the new
+  content and a revoked link is gone. `generateStaticParams` returns one placeholder token because
+  Cache Components require a parameter at build time; real tokens are secret, so pages are
+  rendered on the first visit and cached after it. The API response is validated with zod and
+  rendered through a whitelist renderer: every block type maps to a fixed React element, there is
+  no `dangerouslySetInnerHTML`, links get `rel="noopener noreferrer nofollow ugc"`.
+- **SEO.** `generateMetadata` builds the title, description, canonical URL and Open Graph tags
+  from the document. Private pages and shared-edit pages are `noindex`.
+- **Private data is never cached on the server.** It is per user and permission sensitive, so the
+  data access layer (`src/shared/dal`) fetches it with `cache: 'no-store'` and only deduplicates
+  within one request (`React.cache`). Reads that are expensive are cached on the backend, where
+  invalidation is exact: the document tree lives in Redis and is dropped on every tree change.
+- **Streaming SSR.** The workspace dashboard has independent sections (mentions, members, plan
+  usage, pages). Each one has its own `<Suspense>` and its own error boundary (`catchError`), so
+  the shell arrives immediately, every section streams in as soon as its request finishes and a
+  failing section shows "Try again" without breaking the others.
+- **Proxy (`proxy.ts`, the Next 16 name of middleware).** Separates public routes (`/p`, auth
+  pages) from private ones (`/w`, `/workspaces`, `/s`, `/billing`), redirects signed-out users to
+  the login page with a safe `next`, refreshes an expired access token and forwards the new
+  cookies. The check is optimistic (expiry only, no database); the API is the authority.
+- **Server Actions vs real-time.** Settings-style mutations go through Server Actions: rename the
+  workspace, invite and revoke, share links, start and pay a checkout. Each validates its input with
+  zod and calls `refresh()`. Interactive tree operations call the API from the browser for instant
+  feedback. Document content never goes through either: it is a Yjs update on the WebSocket.
+- **One place for errors.** Server: `load`/`mutate` in the DAL turn `401` into a clean sign-out,
+  `404` into `notFound()` and other statuses into an `ApiError`, rendered by `error.tsx`. Browser:
+  `unwrap` + `notifyError` (toast with the correlation id), and plan limits (`402`) offer a link to
+  the plans. The CRDT connection state lives in one `CollabSession`, which maps close codes to
+  states (connecting, online, offline, no access, signed out) for the indicator and the editor.
+- **States.** Every page has a skeleton while it loads, empty states with a next step, and errors
+  either inline (forms, sections) or through `error.tsx`/`not-found.tsx`. The editor shows offline
+  and reconnecting states and keeps accepting input; Yjs syncs it when the connection is back.
+
+The frontend follows Feature-Sliced Design, checked with steiger.
 
 ## Real-time collaboration
 
@@ -263,3 +327,57 @@ not routed through the public `/api` prefix.
 - `.env.staging.example` — staging (`docker compose --env-file .env.staging up -d`)
 
 The backend loads `.env.${NODE_ENV}` first, then `.env`, both from the repo root.
+
+## Consistency model
+
+| Strong (checked in the same transaction or query)      | Eventual (asynchronous, through queues)                   |
+| ------------------------------------------------------ | --------------------------------------------------------- |
+| permissions: every request and every WebSocket message | search index (seconds behind edits)                       |
+| plan limits and plan changes (workspace row locked)    | public pages (ISR, revalidated a few seconds after edits) |
+| billing events (locked, processed once)                | mention notifications                                     |
+| document content (CRDT: converges, nothing is lost)    | automatic versions                                        |
+
+Rights and money must never be stale: a viewer must not write because a cache is behind, and a plan
+must not be applied twice. Search, published pages and notifications can lag by seconds without
+harm, and making them asynchronous keeps editing fast and lets a job be retried when a dependency
+is down. Search results and published pages still never leak: access and link validity are
+checked against live data at read time.
+
+## Edge cases
+
+- **Two people edit the same block.** Yjs merges both changes character by character; there is no
+  "last write wins". Covered by unit tests of the merge and an e2e test with two browsers.
+- **A document is deleted while someone edits it.** The API publishes an access change, the gateway
+  closes the session with `4404` and the editor switches to "This page is no longer available";
+  nothing is written after deletion.
+- **Publishing with unsaved local changes.** The public page shows what the server has persisted.
+  Offline edits are sent when the connection returns and trigger a new revalidation.
+- **The same CRDT update or webhook arrives twice.** Yjs updates are idempotent; a webhook event is
+  stored under its provider id and processed once.
+
+## Testing
+
+```bash
+cd backend  && npm test && npm run test:e2e   # unit (permissions, CRDT merge, webhooks) and API e2e
+cd frontend && npm test                       # unit and component tests (Vitest)
+cd frontend && npx playwright test            # browser e2e against a running stack
+```
+
+Playwright covers the critical flows end to end: a viewer cannot edit in the UI, two people editing
+at once, publishing → SSR/ISR page → edit → revalidated content → revoked link, plan limit → mock
+checkout → lifted limit, search, image upload. CI (GitHub Actions) runs lint, typecheck, unit and
+e2e tests for both apps, builds both images and runs Playwright against `docker compose`.
+
+## Trade-offs and what I would do differently
+
+- **One collab gateway instance.** Scaling out needs sticky routing per document or a shared Yjs
+  backend (y-redis).
+- **ISR cache in memory.** Fine for one frontend instance; several instances need a shared
+  `cacheHandler` (Redis) so that a revalidation reaches all of them.
+- **Polling for comments and notifications.** Simple and robust; with more time they would use
+  server-sent events or the existing WebSocket.
+- **The first visit of an unknown public link answers `200` with `noindex`** while the page
+  streams; later visits get `404` from the cache.
+- **Mock billing only.** No proration, downgrades or cancellation flow.
+- **Access tokens in cookies, refresh in the proxy.** Good for SSR; a production setup would add
+  CSRF tokens on top of the `Origin` check and `SameSite` cookies.

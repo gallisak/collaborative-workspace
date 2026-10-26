@@ -16,7 +16,7 @@ x-backend-env: &backend-env
   S3_BUCKET: ${S3_BUCKET:-collab-docs}
   JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret-change-me}
   REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-dev-refresh-secret-change-me}
-  REVALIDATE_URL: ${REVALIDATE_URL:-http://web:3000/internal/revalidate}
+  REVALIDATE_URL: http://web:3000/internal/revalidate
   REVALIDATE_SECRET: ${REVALIDATE_SECRET:-dev-revalidate-secret-change-me}
   BILLING_WEBHOOK_SECRET: ${BILLING_WEBHOOK_SECRET:-dev-billing-webhook-secret-change-me}
 
@@ -157,6 +157,30 @@ services:
       timeout: 3s
       retries: 5
     depends_on: *backend-deps
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_INTERNAL_URL: http://api:4000
+        NEXT_PUBLIC_COLLAB_URL: ${NEXT_PUBLIC_COLLAB_URL:-ws://localhost:4001}
+    environment:
+      API_INTERNAL_URL: http://api:4000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-dev-revalidate-secret-change-me}
+    ports:
+      - '127.0.0.1:${WEB_PORT:-3000}:3000'
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/login']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      api:
+        condition: service_healthy
+      collab:
+        condition: service_healthy
 
 volumes:
   postgres-data:
