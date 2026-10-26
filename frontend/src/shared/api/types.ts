@@ -12,3 +12,5 @@ export type Version = Schemas['VersionDto'];
 export type Thread = Schemas['ThreadDto'];
 export type Comment = Schemas['CommentDto'];
 export type Notification = Schemas['NotificationDto'];
+export type ShareLink = Schemas['ShareLinkDto'];
+export type AccessLevel = Schemas['AccessLevel'];

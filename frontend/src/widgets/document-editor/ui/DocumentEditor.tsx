@@ -30,10 +30,13 @@ export interface CommentBinding {
 
 interface DocumentEditorProps {
   documentId: string;
+  shareToken?: string;
   user: EditorUser;
   editable: boolean;
-  comments: CommentBinding;
+  comments?: CommentBinding;
 }
+
+const NO_COMMENTS: CommentBinding = { blockIds: [], activeBlockId: null, onOpenBlock: () => {} };
 
 function EditorSkeleton() {
   return (
@@ -131,14 +134,20 @@ function CollaborativeEditor({
   );
 }
 
-export function DocumentEditor({ documentId, user, editable, comments }: DocumentEditorProps) {
-  const session = useCollabSession(documentId);
+export function DocumentEditor({
+  documentId,
+  shareToken,
+  user,
+  editable,
+  comments = NO_COMMENTS,
+}: DocumentEditorProps) {
+  const session = useCollabSession(documentId, shareToken ?? null);
   if (!session) {
     return <EditorSkeleton />;
   }
   return (
     <CollaborativeEditor
-      key={documentId}
+      key={`${documentId}:${shareToken ?? ''}`}
       session={session}
       user={user}
       editable={editable}

@@ -26,12 +26,15 @@ export class CollabSession {
   private readonly peopleListeners = new Set<() => void>();
   private browserOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
 
-  constructor(readonly documentId: string) {
+  constructor(
+    readonly documentId: string,
+    readonly shareToken: string | null = null,
+  ) {
     this.provider = new WebsocketProvider(
       `${publicEnv.NEXT_PUBLIC_COLLAB_URL}/documents`,
       documentId,
       this.doc,
-      { connect: false, disableBc: true },
+      { connect: false, disableBc: true, params: shareToken ? { share: shareToken } : {} },
     );
     this.provider.on('status', ({ status }) => {
       if (this.isTerminal() || !this.browserOnline) {
@@ -136,13 +139,18 @@ export const subscribeSessions = (listener: () => void) => {
   return () => registryListeners.delete(listener);
 };
 
-export const sessionFor = (documentId: string) => sessions.get(documentId)?.session ?? null;
+const sessionKey = (documentId: string, shareToken: string | null) =>
+  shareToken ? `${documentId}?share=${shareToken}` : documentId;
 
-export function acquireSession(documentId: string) {
-  let entry = sessions.get(documentId);
+export const sessionFor = (documentId: string, shareToken: string | null = null) =>
+  sessions.get(sessionKey(documentId, shareToken))?.session ?? null;
+
+export function acquireSession(documentId: string, shareToken: string | null = null) {
+  const key = sessionKey(documentId, shareToken);
+  let entry = sessions.get(key);
   if (!entry) {
-    entry = { session: new CollabSession(documentId), refs: 0 };
-    sessions.set(documentId, entry);
+    entry = { session: new CollabSession(documentId, shareToken), refs: 0 };
+    sessions.set(key, entry);
     entry.session.connect();
     notify();
   }
@@ -155,8 +163,8 @@ export function acquireSession(documentId: string) {
       return;
     }
     current.release = window.setTimeout(() => {
-      if (current.refs === 0 && sessions.get(documentId) === current) {
-        sessions.delete(documentId);
+      if (current.refs === 0 && sessions.get(key) === current) {
+        sessions.delete(key);
         current.session.destroy();
         notify();
       }

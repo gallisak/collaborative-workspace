@@ -6,7 +6,7 @@ export const ACCESS_COOKIE = 'access_token';
 export const REFRESH_COOKIE = 'refresh_token';
 const EXPIRY_LEEWAY_MS = 10_000;
 
-const PROTECTED = [/^\/workspaces(\/|$)/, /^\/w\//, /^\/invitations(\/|$)/];
+const PROTECTED = [/^\/workspaces(\/|$)/, /^\/w\//, /^\/s\//, /^\/invitations(\/|$)/];
 const GUEST_ONLY = [routes.login, routes.register];
 
 export interface SessionProxyOptions {

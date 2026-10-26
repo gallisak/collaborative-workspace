@@ -18,9 +18,12 @@ async function DocumentView({ params }: DocumentPageProps) {
     ),
   ]);
   const canModerate = document.access === 'MANAGE';
-  const grants = canModerate
-    ? await load((api) => api.GET('/api/documents/{documentId}/permissions', path))
-    : [];
+  const [grants, shareLinks] = canModerate
+    ? await Promise.all([
+        load((api) => api.GET('/api/documents/{documentId}/permissions', path)),
+        load((api) => api.GET('/api/documents/{documentId}/share-links', path)),
+      ])
+    : [[], []];
   const candidates = new Map(
     [...(members ?? []), ...grants]
       .filter((person) => person.userId !== user.id)
@@ -34,6 +37,7 @@ async function DocumentView({ params }: DocumentPageProps) {
       user={{ id: user.id, name: user.name }}
       editable={document.access === 'EDIT' || canModerate}
       canModerate={canModerate}
+      shareLinks={shareLinks}
       candidates={[...candidates.values()]}
     />
   );

@@ -5,7 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { displayTitle } from '@/entities/document';
 import { TitleInput } from '@/features/rename-document';
+import { ShareMenu } from '@/features/share-document';
 import type { MentionCandidate } from '@/features/write-comment';
+import type { ShareLink } from '@/shared/api';
 import { cn } from '@/shared/lib';
 import { Button } from '@/shared/ui/button';
 import { CommentsPanel, useThreads } from '@/widgets/document-comments';
@@ -20,6 +22,7 @@ interface DocumentWorkspaceProps {
   user: { id: string; name: string };
   editable: boolean;
   canModerate: boolean;
+  shareLinks: ShareLink[];
   candidates: MentionCandidate[];
 }
 
@@ -29,6 +32,7 @@ export function DocumentWorkspace({
   user,
   editable,
   canModerate,
+  shareLinks,
   candidates,
 }: DocumentWorkspaceProps) {
   const linkedThread = useSearchParams()?.get('thread') ?? null;
@@ -92,6 +96,7 @@ export function DocumentWorkspace({
             )}
           </div>
           <div className="flex shrink-0 gap-1 pt-2">
+            {canModerate && <ShareMenu documentId={documentId} links={shareLinks} />}
             <Button
               variant="ghost"
               size="sm"

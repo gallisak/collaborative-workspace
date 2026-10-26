@@ -19,6 +19,8 @@ async function uncachedFetch(request: Request) {
   });
 }
 
+export const publicApi = createClient<paths>({ baseUrl: serverEnv.API_INTERNAL_URL });
+
 export type ServerApi = Awaited<ReturnType<typeof serverApi>>;
 
 export async function serverApi() {
@@ -83,3 +85,5 @@ export async function mutate<T>(
 }
 
 export const getSessionUser = cache(() => load((api) => api.GET('/api/auth/me')));
+
+export { serverEnv };

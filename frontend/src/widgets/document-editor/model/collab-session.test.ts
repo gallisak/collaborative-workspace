@@ -6,6 +6,12 @@ vi.mock('@/shared/api', () => ({ refreshSession }));
 
 vi.mock('y-websocket', () => {
   class FakeProvider {
+    constructor(
+      readonly url: string,
+      readonly room: string,
+      readonly doc: unknown,
+      readonly options: Record<string, unknown>,
+    ) {}
     handlers = new Map<string, ((...args: unknown[]) => void)[]>();
     connect = vi.fn();
     disconnect = vi.fn();
@@ -27,6 +33,8 @@ vi.mock('y-websocket', () => {
 });
 
 type Fake = {
+  room: string;
+  options: Record<string, unknown>;
   emit: (event: string, ...args: unknown[]) => void;
   states: Map<number, Record<string, unknown>>;
   awarenessHandlers: (() => void)[];
@@ -126,6 +134,22 @@ describe('session registry', () => {
     vi.runAllTimers();
     expect(sessionFor('doc-2')).toBeNull();
     expect(fake(session).destroy).toHaveBeenCalled();
+  });
+
+  it('joins through a share link with its own connection', () => {
+    vi.useFakeTimers();
+    const releaseMember = acquireSession('doc-4');
+    const releaseShared = acquireSession('doc-4', 'share-token');
+    const shared = sessionFor('doc-4', 'share-token')!;
+
+    expect(shared).not.toBe(sessionFor('doc-4'));
+    expect(fake(shared).room).toBe('doc-4');
+    expect(fake(shared).options.params).toEqual({ share: 'share-token' });
+    expect(fake(sessionFor('doc-4')!).options.params).toEqual({});
+
+    releaseMember();
+    releaseShared();
+    vi.runAllTimers();
   });
 
   it('survives an immediate remount such as React strict mode', () => {

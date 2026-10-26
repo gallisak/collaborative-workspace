@@ -48,6 +48,12 @@ describe('sessionProxy', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('requires a session to edit through a shared link', async () => {
+    const response = await sessionProxy(request('/s/token'), options);
+
+    expect(getRedirectUrl(response)).toBe('http://app.test/login?next=%2Fs%2Ftoken');
+  });
+
   it('lets public pages through without a session', async () => {
     const response = await sessionProxy(request('/login'), options);
 

@@ -12,11 +12,14 @@ import {
 const CONNECTING: SessionSnapshot = { state: 'connecting', synced: false };
 const noopSubscribe = () => () => {};
 
-export function useCollabSession(documentId: string): CollabSession | null {
-  useEffect(() => acquireSession(documentId), [documentId]);
+export function useCollabSession(
+  documentId: string,
+  shareToken: string | null,
+): CollabSession | null {
+  useEffect(() => acquireSession(documentId, shareToken), [documentId, shareToken]);
   return useSyncExternalStore(
     subscribeSessions,
-    () => sessionFor(documentId),
+    () => sessionFor(documentId, shareToken),
     () => null,
   );
 }
