@@ -6,12 +6,17 @@ import { config } from './proxy';
 const matches = (url: string) => unstable_doesMiddlewareMatch({ config, nextConfig, url });
 
 describe('proxy matcher', () => {
-  it.each(['/', '/login', '/workspaces', '/w/1/d/2', '/s/token', '/invitations/accept'])(
-    'runs on %s',
-    (url) => {
-      expect(matches(url)).toBe(true);
-    },
-  );
+  it.each([
+    '/',
+    '/login',
+    '/workspaces',
+    '/w/1/d/2',
+    '/s/token',
+    '/billing/checkout/1',
+    '/invitations/accept',
+  ])('runs on %s', (url) => {
+    expect(matches(url)).toBe(true);
+  });
 
   it.each([
     '/api/auth/login',

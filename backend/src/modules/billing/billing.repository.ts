@@ -27,13 +27,19 @@ export class BillingRepository extends PrismaRepository {
     return this.prisma.plan.findUniqueOrThrow({ where: { id: planId } });
   }
 
-  findWorkspace(workspaceId: string) {
+  findWorkspace(workspaceId: string, now = new Date()) {
     return this.prisma.workspace.findUniqueOrThrow({
       where: { id: workspaceId },
       include: {
         plan: true,
         subscription: { select: { status: true, currentPeriodEnd: true } },
-        _count: { select: { members: true, documents: { where: { deletedAt: null } } } },
+        _count: {
+          select: {
+            members: true,
+            documents: { where: { deletedAt: null } },
+            invitations: { where: { acceptedAt: null, revokedAt: null, expiresAt: { gt: now } } },
+          },
+        },
       },
     });
   }

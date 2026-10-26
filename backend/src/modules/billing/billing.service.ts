@@ -63,6 +63,7 @@ export class BillingService {
       subscription: workspace.subscription,
       usage: {
         members: workspace._count.members,
+        pendingInvitations: workspace._count.invitations,
         documents: workspace._count.documents,
         storageBytes: Number(storageBytes),
       },

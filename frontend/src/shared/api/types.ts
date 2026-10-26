@@ -14,3 +14,6 @@ export type Comment = Schemas['CommentDto'];
 export type Notification = Schemas['NotificationDto'];
 export type ShareLink = Schemas['ShareLinkDto'];
 export type AccessLevel = Schemas['AccessLevel'];
+export type Plan = Schemas['PlanDto'];
+export type WorkspaceBilling = Schemas['WorkspaceBillingDto'];
+export type CheckoutSession = Schemas['CheckoutSessionDto'];

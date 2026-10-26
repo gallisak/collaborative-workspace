@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState, useEffect, useRef } from 'react';
 import { type AssignableRole, ROLE_LABELS } from '@/entities/workspace';
 import { initialFormState } from '@/shared/api';
+import { routes } from '@/shared/config';
 import { Alert, AlertDescription } from '@/shared/ui/alert';
 import { Button } from '@/shared/ui/button';
 import { FormField } from '@/shared/ui/form-field';
@@ -32,7 +34,14 @@ export function InviteMemberForm({ workspaceId, roles }: InviteMemberFormProps) 
     <form ref={form} action={action} className="grid gap-3" noValidate>
       {state.error && (
         <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>
+            {state.error}
+            {state.limitReached && (
+              <Link href={routes.workspaceBilling(workspaceId)} className="font-medium underline">
+                View plans
+              </Link>
+            )}
+          </AlertDescription>
         </Alert>
       )}
       <div className="flex flex-wrap items-end gap-3">

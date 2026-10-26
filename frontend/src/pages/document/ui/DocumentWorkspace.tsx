@@ -123,6 +123,7 @@ export function DocumentWorkspace({
           documentId={documentId}
           user={user}
           editable={editable}
+          imageUploads={editable}
           comments={comments}
         />
       </article>

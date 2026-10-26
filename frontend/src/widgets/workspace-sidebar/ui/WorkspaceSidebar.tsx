@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Settings } from 'lucide-react';
+import { CreditCard, Home, Search, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -56,10 +56,16 @@ export function WorkspaceSidebar({
         <>
           <nav aria-label="Workspace" className="grid gap-px">
             <NavLink href={routes.workspace(workspaceId)} icon={<Home />} label="Home" />
+            <NavLink href={routes.workspaceSearch(workspaceId)} icon={<Search />} label="Search" />
             <NavLink
               href={routes.workspaceSettings(workspaceId)}
               icon={<Settings />}
               label="Settings"
+            />
+            <NavLink
+              href={routes.workspaceBilling(workspaceId)}
+              icon={<CreditCard />}
+              label="Billing"
             />
           </nav>
           <ScrollArea className="-mx-2 min-h-0 flex-1 px-2">

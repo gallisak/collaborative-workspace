@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import { ImageButton } from '@/features/insert-image';
 import { Button } from '@/shared/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { blockAtSelection } from '../model/comment-highlight';
@@ -62,10 +63,16 @@ function ToolButton({
 interface EditorToolbarProps {
   editor: Editor;
   disabled: boolean;
+  imageDocumentId?: string;
   onComment?: (blockId: string) => void;
 }
 
-export function EditorToolbar({ editor, disabled, onComment }: EditorToolbarProps) {
+export function EditorToolbar({
+  editor,
+  disabled,
+  imageDocumentId,
+  onComment,
+}: EditorToolbarProps) {
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -186,6 +193,9 @@ export function EditorToolbar({ editor, disabled, onComment }: EditorToolbarProp
       >
         <SquareCode />
       </ToolButton>
+      {imageDocumentId && (
+        <ImageButton editor={editor} documentId={imageDocumentId} disabled={disabled} />
+      )}
       <span className="bg-border mx-1 h-5 w-px" />
       <ToolButton
         label="Undo"

@@ -3,7 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useDocumentTree } from '@/entities/document';
-import { api, unwrap } from '@/shared/api';
+import { toast } from 'sonner';
+import { ApiError, api, unwrap } from '@/shared/api';
 import { routes } from '@/shared/config';
 import { notifyError } from '@/shared/lib';
 
@@ -25,7 +26,16 @@ export function useCreateDocument(onCreated?: (parentId: string | null) => void)
       onCreated?.(parentId);
       router.push(routes.document(workspaceId, document.id));
     } catch (error) {
-      notifyError(error);
+      if (error instanceof ApiError && error.status === 402) {
+        toast.error(error.message, {
+          action: {
+            label: 'View plans',
+            onClick: () => router.push(routes.workspaceBilling(workspaceId)),
+          },
+        });
+      } else {
+        notifyError(error);
+      }
     } finally {
       setCreating(false);
     }

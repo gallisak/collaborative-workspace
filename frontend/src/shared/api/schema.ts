@@ -1044,6 +1044,8 @@ export interface components {
         };
         UsageDto: {
             members: number;
+            /** @description Open invitations, they take a member seat until they expire */
+            pendingInvitations: number;
             documents: number;
             storageBytes: number;
         };

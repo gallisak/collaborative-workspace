@@ -99,7 +99,7 @@ describe('Billing (e2e)', () => {
     expect(billing.body).toMatchObject({
       plan: { id: 'PRO', maxMembers: 10 },
       subscription: { status: 'ACTIVE' },
-      usage: { members: 1, documents: 0 },
+      usage: { members: 1, pendingInvitations: 2, documents: 0 },
     });
     const paid = await owner.get(`/api/billing/checkout-sessions/${session.id}`).expect(200);
     expect(paid.body.status).toBe('COMPLETED');

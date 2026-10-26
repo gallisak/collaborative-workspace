@@ -46,6 +46,9 @@ export class UsageDto {
   @ApiProperty()
   members: number;
 
+  @ApiProperty({ description: 'Open invitations, they take a member seat until they expire' })
+  pendingInvitations: number;
+
   @ApiProperty()
   documents: number;
 

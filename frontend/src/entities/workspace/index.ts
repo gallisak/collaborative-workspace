@@ -3,6 +3,7 @@ export {
   type AssignableRole,
   assignableRoles,
   canEditContent,
+  canManageBilling,
   canManageMembers,
   ROLE_LABELS,
 } from './model/roles';

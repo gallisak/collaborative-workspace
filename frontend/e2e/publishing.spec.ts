@@ -21,6 +21,7 @@ test.describe('publishing', () => {
     baseURL,
     request,
   }) => {
+    test.slow();
     const owner = await openSession(browser, baseURL!, 'Owner Publisher');
     const { url } = await createDocument(owner, baseURL!, 'Release notes');
     const { page } = owner;

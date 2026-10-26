@@ -33,6 +33,7 @@ interface DocumentEditorProps {
   shareToken?: string;
   user: EditorUser;
   editable: boolean;
+  imageUploads?: boolean;
   comments?: CommentBinding;
 }
 
@@ -52,11 +53,13 @@ function CollaborativeEditor({
   session,
   user,
   editable,
+  imageUploads,
   comments,
 }: {
   session: CollabSession;
   user: EditorUser;
   editable: boolean;
+  imageUploads: boolean;
   comments: CommentBinding;
 }) {
   const snapshot = useSessionSnapshot(session);
@@ -126,7 +129,12 @@ function CollaborativeEditor({
         </Alert>
       )}
       {editor && editable && (
-        <EditorToolbar editor={editor} disabled={!writable} onComment={comments.onComment} />
+        <EditorToolbar
+          editor={editor}
+          disabled={!writable}
+          imageDocumentId={imageUploads ? session.documentId : undefined}
+          onComment={comments.onComment}
+        />
       )}
       {!snapshot.synced && <EditorSkeleton />}
       <EditorContent editor={editor} className={snapshot.synced ? undefined : 'hidden'} />
@@ -139,6 +147,7 @@ export function DocumentEditor({
   shareToken,
   user,
   editable,
+  imageUploads = false,
   comments = NO_COMMENTS,
 }: DocumentEditorProps) {
   const session = useCollabSession(documentId, shareToken ?? null);
@@ -151,6 +160,7 @@ export function DocumentEditor({
       session={session}
       user={user}
       editable={editable}
+      imageUploads={imageUploads}
       comments={comments}
     />
   );

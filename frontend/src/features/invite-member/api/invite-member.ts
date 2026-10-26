@@ -34,7 +34,7 @@ export async function inviteMember(
     }),
   );
   if (!result.ok) {
-    return { error: result.error };
+    return { error: result.error, limitReached: result.status === 402 };
   }
   refresh();
   return { success: `Invitation sent to ${email}` };

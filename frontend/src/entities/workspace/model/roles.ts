@@ -17,6 +17,7 @@ export const hasRoleAtLeast = (role: WorkspaceRole, minimum: WorkspaceRole) =>
 
 export const canEditContent = (role: WorkspaceRole) => hasRoleAtLeast(role, 'EDITOR');
 export const canManageMembers = (role: WorkspaceRole) => hasRoleAtLeast(role, 'ADMIN');
+export const canManageBilling = (role: WorkspaceRole) => hasRoleAtLeast(role, 'ADMIN');
 
 export const canAssignRole = (actor: WorkspaceRole, target: WorkspaceRole) =>
   target !== 'OWNER' && canManageMembers(actor) && RANK[actor] > RANK[target];
