@@ -24,12 +24,18 @@ export class CreateDocumentDto {
   @MaxLength(200)
   title?: string;
 
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, description: 'Omit or null for root' })
+  @ApiPropertyOptional({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'Omit or null for root',
+  })
   @IsOptional()
   @IsUUID()
   parentId?: string | null;
 
   @ApiPropertyOptional({
+    type: String,
     format: 'uuid',
     nullable: true,
     description: 'Sibling to place after; null puts it first, omitted puts it last',
@@ -48,12 +54,18 @@ export class UpdateDocumentDto {
 }
 
 export class MoveDocumentDto {
-  @ApiProperty({ format: 'uuid', nullable: true, description: 'null moves to the root' })
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'null moves to the root',
+  })
   @ValidateIf((_, value) => value !== null)
   @IsUUID()
   parentId: string | null;
 
   @ApiPropertyOptional({
+    type: String,
     format: 'uuid',
     nullable: true,
     description: 'Sibling to place after; null puts it first, omitted puts it last',
