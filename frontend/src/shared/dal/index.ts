@@ -8,6 +8,17 @@ import type { paths } from '../api/schema';
 import { serverEnv } from '../config/server-env';
 import { routes } from '../config/routes';
 
+const BODYLESS = new Set(['GET', 'HEAD']);
+
+async function uncachedFetch(request: Request) {
+  return fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: BODYLESS.has(request.method) ? undefined : await request.text(),
+    cache: 'no-store',
+  });
+}
+
 export type ServerApi = Awaited<ReturnType<typeof serverApi>>;
 
 export async function serverApi() {
@@ -18,7 +29,7 @@ export async function serverApi() {
       ...(cookieHeader && { cookie: cookieHeader }),
       origin: new URL(serverEnv.FRONTEND_URL).origin,
     },
-    cache: 'no-store',
+    fetch: uncachedFetch,
   });
 }
 

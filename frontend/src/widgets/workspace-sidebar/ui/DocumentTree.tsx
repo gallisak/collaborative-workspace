@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { FileText } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   ancestorsOf,
   displayTitle,
@@ -41,6 +41,7 @@ interface DragState {
 }
 
 export function DocumentTree({ editable }: { editable: boolean }) {
+  const dndId = useId();
   const params = useParams<{ documentId?: string }>();
   const currentId = params?.documentId;
   const { workspaceId, nodes } = useDocumentTree();
@@ -97,6 +98,7 @@ export function DocumentTree({ editable }: { editable: boolean }) {
 
   return (
     <DndContext
+      id={dndId}
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={onDragStart}

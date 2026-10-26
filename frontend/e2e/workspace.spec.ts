@@ -20,7 +20,7 @@ async function newPage(page: Page, title: string, parent?: string) {
   await untitled.hover();
   await page.getByRole('button', { name: 'Actions for Untitled' }).first().click();
   await page.getByRole('menuitem', { name: 'Rename' }).click();
-  const input = page.getByRole('textbox', { name: 'Page title' });
+  const input = tree(page).getByRole('textbox', { name: 'Page title' });
   await input.fill(title);
   await input.press('Enter');
   await expect(tree(page).getByRole('link', { name: title })).toBeVisible();

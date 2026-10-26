@@ -98,3 +98,74 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  .document-content {
+    @apply min-h-[50vh] py-4 text-base leading-7 outline-none;
+  }
+  .document-content > * + * {
+    @apply mt-3;
+  }
+  .document-content h1 {
+    @apply mt-8 text-3xl font-bold tracking-tight;
+  }
+  .document-content h2 {
+    @apply mt-6 text-2xl font-semibold tracking-tight;
+  }
+  .document-content h3 {
+    @apply mt-5 text-xl font-semibold;
+  }
+  .document-content ul:not([data-type='taskList']) {
+    @apply list-disc pl-6;
+  }
+  .document-content ol {
+    @apply list-decimal pl-6;
+  }
+  .document-content li > p {
+    @apply my-0.5;
+  }
+  .document-content ul[data-type='taskList'] {
+    @apply pl-0;
+  }
+  .document-content ul[data-type='taskList'] li {
+    @apply flex items-start gap-2;
+  }
+  .document-content ul[data-type='taskList'] li > label {
+    @apply mt-1 shrink-0;
+  }
+  .document-content ul[data-type='taskList'] li > div {
+    @apply flex-1;
+  }
+  .document-content ul[data-type='taskList'] li[data-checked='true'] > div {
+    @apply text-muted-foreground line-through;
+  }
+  .document-content a {
+    @apply text-primary underline underline-offset-4;
+  }
+  .document-content code {
+    @apply bg-muted rounded px-1.5 py-0.5 font-mono text-sm;
+  }
+  .document-content pre {
+    @apply bg-muted overflow-x-auto rounded-lg p-4 font-mono text-sm leading-6;
+  }
+  .document-content pre code {
+    @apply bg-transparent p-0;
+  }
+  .document-content img {
+    @apply max-w-full rounded-lg;
+  }
+  .document-content img.ProseMirror-selectednode {
+    @apply ring-ring ring-2;
+  }
+  .document-content p.is-editor-empty:first-child::before {
+    @apply text-muted-foreground pointer-events-none float-left h-0;
+    content: attr(data-placeholder);
+  }
+  .collaboration-carets__caret {
+    @apply pointer-events-none relative -mx-px border-x;
+    word-break: normal;
+  }
+  .collaboration-carets__label {
+    @apply absolute -top-5 -left-px rounded-sm px-1.5 py-0.5 text-xs leading-none font-medium whitespace-nowrap text-white select-none;
+  }
+}

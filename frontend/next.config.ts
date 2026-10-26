@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 import { existsSync, readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 
-const SHARED_ENV = ['API_INTERNAL_URL', 'FRONTEND_URL'] as const;
+const SHARED_ENV = ['API_INTERNAL_URL', 'FRONTEND_URL', 'NEXT_PUBLIC_COLLAB_URL'] as const;
 
 const rootEnv = new URL('../.env', import.meta.url);
 if (existsSync(rootEnv)) {
