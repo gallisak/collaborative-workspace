@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { WorkspaceRole } from '../../generated/prisma/enums.js';
 import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-work.js';
+import { activeShareLinkWhere } from '../permissions/document-access.js';
 
 @Injectable()
 export class WorkspacesRepository extends PrismaRepository {
@@ -39,8 +40,7 @@ export class WorkspacesRepository extends PrismaRepository {
     const links = await tx.shareLink.findMany({
       where: {
         document: { workspaceId, deletedAt: null },
-        revokedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        ...activeShareLinkWhere(now),
       },
       distinct: ['documentId'],
       select: { documentId: true },

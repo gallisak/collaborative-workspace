@@ -254,6 +254,32 @@ describe('Documents (e2e)', () => {
       expect((await guest.get('/api/shared-documents').expect(200)).body).toEqual([]);
     });
 
+    it('lets only admins move a page out from under a restricted section', async () => {
+      const { owner, workspaceId } = await setup();
+      const restricted = await join(owner, workspaceId, 'EDITOR');
+      const mover = await join(owner, workspaceId, 'EDITOR');
+      const section = await create(owner, workspaceId, { title: 'Section' });
+      const page = await create(owner, workspaceId, { title: 'Page', parentId: section });
+      const other = await create(owner, workspaceId, { title: 'Other' });
+      await owner
+        .put(`/api/documents/${section}/permissions`)
+        .send({ email: restricted.email, accessLevel: 'VIEW' })
+        .expect(204);
+
+      await mover.post(`/api/documents/${page}/move`).send({ parentId: null }).expect(403);
+      await mover.post(`/api/documents/${page}/move`).send({ parentId: other }).expect(403);
+      const stillRestricted = await restricted.get(`/api/documents/${page}`).expect(200);
+      expect(stillRestricted.body.access).toBe('VIEW');
+
+      await mover
+        .post(`/api/documents/${other}/move`)
+        .send({ parentId: null, afterId: null })
+        .expect(200);
+      await owner.post(`/api/documents/${page}/move`).send({ parentId: null }).expect(200);
+      const lifted = await restricted.get(`/api/documents/${page}`).expect(200);
+      expect(lifted.body.access).toBe('EDIT');
+    });
+
     it('drops the document grants of a removed member', async () => {
       const { owner, workspaceId } = await setup();
       const member = await join(owner, workspaceId, 'VIEWER');

@@ -4,7 +4,7 @@ import * as Y from 'yjs';
 import type { Env } from '../../infra/config/env.schema.js';
 import { PageRevalidationService } from '../publishing/page-revalidation.service.js';
 import { SearchIndexingService } from '../search/search-indexing.service.js';
-import { DocumentStore } from './document-store.js';
+import { applyStored, DocumentStore } from './document-store.js';
 import { CloseCode } from './protocol.js';
 import { type CollabClient, LOAD_ORIGIN, Room } from './room.js';
 import { type PersistenceOptions, RoomPersistence } from './room-persistence.js';
@@ -182,18 +182,7 @@ export class RoomsService {
         ),
     );
     room.lastVersionAt = lastVersionAt;
-    Y.transact(
-      room.doc,
-      () => {
-        if (stored.state) {
-          Y.applyUpdate(room.doc, stored.state);
-        }
-        for (const update of stored.updates) {
-          Y.applyUpdate(room.doc, update.data);
-        }
-      },
-      LOAD_ORIGIN,
-    );
+    Y.transact(room.doc, () => applyStored(room.doc, stored), LOAD_ORIGIN);
     this.loaded.set(documentId, room);
     this.logger.debug(
       { documentId, pendingUpdates: stored.updates.length, fromSnapshot: stored.state !== null },

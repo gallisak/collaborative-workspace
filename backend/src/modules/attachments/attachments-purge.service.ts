@@ -7,6 +7,7 @@ import type { Env } from '../../infra/config/env.schema.js';
 import {
   ATTACHMENTS_QUEUE,
   AttachmentJob,
+  type PurgeDocumentsJob,
   type PurgeWorkspaceJob,
 } from '../../infra/queue/attachment-jobs.js';
 import { traced } from '../../infra/queue/traced-job.js';
@@ -22,6 +23,18 @@ export class AttachmentsPurgeService {
   ) {
     this.uploadWindowMs =
       durationToSeconds(config.get('ATTACHMENT_UPLOAD_TTL', { infer: true })) * 1000;
+  }
+
+  async purgeDocuments(documentIds: string[]) {
+    if (documentIds.length === 0) {
+      return;
+    }
+    const job: PurgeDocumentsJob = { documentIds };
+    try {
+      await this.queue.add(AttachmentJob.PurgeDocuments, traced(job));
+    } catch (error) {
+      this.logger.error({ err: error, documentIds }, 'Scheduling image cleanup failed');
+    }
   }
 
   async purgeWorkspace(workspaceId: string) {

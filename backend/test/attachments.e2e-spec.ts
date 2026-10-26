@@ -219,6 +219,29 @@ describe('Attachments (e2e)', () => {
     expect(await prisma.attachment.count({ where: { id: created.attachment.id } })).toBe(0);
   });
 
+  it('frees the storage of a deleted page and removes its images', async () => {
+    const { owner, workspaceId, documentId } = await setup();
+    const created = (await requestUpload(owner, documentId, 1024).expect(201)).body as Created;
+    await uploadTo(created, png(1024));
+    await owner.post(`/api/attachments/${created.attachment.id}/complete`).expect(200);
+    const usage = async () =>
+      (await owner.get(`/api/workspaces/${workspaceId}/billing`).expect(200)).body.usage
+        .storageBytes as number;
+    expect(await usage()).toBe(1024);
+    const { objectKey } = await prisma.attachment.findUniqueOrThrow({
+      where: { id: created.attachment.id },
+    });
+
+    await owner.delete(`/api/documents/${documentId}`).expect(204);
+    expect(await usage()).toBe(0);
+
+    await worker
+      .get(UploadCleanupProcessor)
+      .process({ name: AttachmentJob.PurgeDocuments, data: { documentIds: [documentId] } } as Job);
+    expect(await prisma.attachment.count({ where: { id: created.attachment.id } })).toBe(0);
+    expect(await worker.get(StorageService).head(objectKey)).toBeNull();
+  });
+
   it('removes the files of a deleted workspace from storage', async () => {
     const { owner, workspaceId, documentId } = await setup();
     const created = (await requestUpload(owner, documentId, 1024).expect(201)).body as Created;

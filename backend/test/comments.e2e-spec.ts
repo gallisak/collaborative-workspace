@@ -1,12 +1,7 @@
-import { getQueueToken } from '@nestjs/bullmq';
 import type { INestApplication } from '@nestjs/common';
-import type { Job, Queue } from 'bullmq';
+import type { Job } from 'bullmq';
 import { MailService } from '../src/infra/mail/mail.service.js';
-import {
-  NOTIFICATIONS_QUEUE,
-  NotificationJob,
-  type NotifyMentionsJob,
-} from '../src/infra/queue/notification-jobs.js';
+import { NotificationJob, type NotifyMentionsJob } from '../src/infra/queue/notification-jobs.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
 import { MentionsProcessor } from '../src/modules/notifications/mentions.processor.js';
 import { eventually } from './collab-harness.js';
@@ -144,11 +139,11 @@ describe('Comments and notifications (e2e)', () => {
     const commentId = res.body.comments[0].id as string;
     await eventually(async () => (await unread(viewer)) === 1);
     await prisma.notification.deleteMany({ where: { commentId } });
+    await prisma.commentMention.updateMany({ where: { commentId }, data: { notifiedAt: null } });
     await prisma.comment.update({
       where: { id: commentId },
       data: { createdAt: new Date(Date.now() - 5 * 60_000) },
     });
-    await worker.get<Queue>(getQueueToken(NOTIFICATIONS_QUEUE)).remove(commentId);
 
     await worker.get(MentionsProcessor).process({ name: NotificationJob.ReconcileMentions } as Job);
 

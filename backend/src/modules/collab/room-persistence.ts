@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import * as Y from 'yjs';
 import { Prisma } from '../../generated/prisma/client.js';
-import type { DocumentStore, StoredDocument } from './document-store.js';
+import { type DocumentStore, lastUpdateIdOf, type StoredDocument } from './document-store.js';
 
 export interface PersistenceOptions {
   flushIntervalMs: number;
@@ -34,7 +34,7 @@ export class RoomPersistence {
     private readonly afterWrite: () => Promise<void>,
   ) {
     this.snapshotUpdateId = stored.snapshotUpdateId;
-    this.lastUpdateId = stored.updates.at(-1)?.id ?? stored.snapshotUpdateId;
+    this.lastUpdateId = lastUpdateIdOf(stored);
     this.updatesSinceSnapshot = stored.updates.length;
   }
 

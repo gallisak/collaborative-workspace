@@ -78,6 +78,9 @@ export class ShareLinksService {
       throw new ServiceUnavailableException('Could not revoke the link, try again');
     });
     await this.links.revoke(linkId);
+    await this.pages.scheduleAt(link.documentId, new Date()).catch((error: unknown) => {
+      this.logger.warn({ err: error, linkId }, 'Scheduling a follow-up revalidation failed');
+    });
     await this.collabEvents.accessChanged(document.workspaceId);
     this.logger.log(
       { workspaceId: document.workspaceId, documentId: link.documentId, linkId, userId },

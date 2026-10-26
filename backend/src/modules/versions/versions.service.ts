@@ -45,7 +45,7 @@ export class VersionsService {
       name: name ?? null,
     };
     await this.queue.add(CollabJob.CreateVersion, traced(job), {
-      deduplication: { id: `version:${documentId}` },
+      deduplication: { id: `version:${documentId}:${name ?? ''}` },
     });
     this.logger.log({ documentId, userId }, 'Version requested');
   }
@@ -62,7 +62,7 @@ export class VersionsService {
       versionId,
     };
     await this.queue.add(CollabJob.RestoreVersion, traced(job), {
-      deduplication: { id: `restore:${documentId}` },
+      deduplication: { id: `restore:${documentId}:${versionId}` },
     });
     this.logger.log({ documentId, versionId, userId }, 'Version restore requested');
   }

@@ -88,21 +88,25 @@ export class NotificationsRepository extends PrismaRepository {
     });
   }
 
-  async undeliveredMentionComments(createdAfter: Date, createdBefore: Date, limit: number) {
-    const rows = await this.prisma.$queryRaw<{ comment_id: string }[]>`
-      SELECT DISTINCT m.comment_id
-      FROM comment_mentions m
-      JOIN comments c ON c.id = m.comment_id
-      WHERE c.deleted_at IS NULL
-        AND c.created_at > ${createdAfter}
-        AND c.created_at < ${createdBefore}
-        AND m.user_id IS DISTINCT FROM c.author_id
-        AND NOT EXISTS (
-          SELECT 1 FROM notifications n
-          WHERE n.dedupe_key = 'mention:' || m.comment_id || ':' || m.user_id
-        )
-      LIMIT ${limit}`;
-    return rows.map((row) => row.comment_id);
+  async unprocessedMentionComments(createdAfter: Date, createdBefore: Date, limit: number) {
+    const rows = await this.prisma.comment.findMany({
+      where: {
+        deletedAt: null,
+        createdAt: { gt: createdAfter, lt: createdBefore },
+        mentions: { some: { notifiedAt: null } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  markMentionsProcessed(commentId: string, at: Date) {
+    return this.prisma.commentMention.updateMany({
+      where: { commentId, notifiedAt: null },
+      data: { notifiedAt: at },
+    });
   }
 
   createMany(data: Prisma.NotificationCreateManyInput[]) {

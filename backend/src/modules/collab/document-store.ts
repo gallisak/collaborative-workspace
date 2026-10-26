@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import * as Y from 'yjs';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaRepository } from '../../infra/prisma/unit-of-work.js';
 
@@ -7,6 +8,18 @@ export interface StoredDocument {
   snapshotUpdateId: bigint;
   updates: { id: bigint; data: Uint8Array }[];
 }
+
+export function applyStored(doc: Y.Doc, stored: StoredDocument) {
+  if (stored.state) {
+    Y.applyUpdate(doc, stored.state);
+  }
+  for (const update of stored.updates) {
+    Y.applyUpdate(doc, update.data);
+  }
+}
+
+export const lastUpdateIdOf = (stored: StoredDocument) =>
+  stored.updates.at(-1)?.id ?? stored.snapshotUpdateId;
 
 @Injectable()
 export class DocumentStore extends PrismaRepository {

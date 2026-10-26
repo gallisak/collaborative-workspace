@@ -7,7 +7,7 @@ import type { Env } from '../../infra/config/env.schema.js';
 import { type IndexDocumentJob, SEARCH_QUEUE, SearchJob } from '../../infra/queue/search-jobs.js';
 import { TracedWorkerHost } from '../../infra/queue/traced-job.js';
 import { CONTENT_FIELD } from '../collab/document-content.js';
-import { DocumentStore } from '../collab/document-store.js';
+import { applyStored, DocumentStore, lastUpdateIdOf } from '../collab/document-store.js';
 import { documentText } from './document-text.js';
 import { SearchIndexingService } from './search-indexing.service.js';
 import { SearchRepository } from './search.repository.js';
@@ -58,13 +58,8 @@ export class SearchIndexProcessor extends TracedWorkerHost implements OnApplicat
     const stored = await this.store.load(documentId);
     const doc = new Y.Doc();
     try {
-      if (stored.state) {
-        Y.applyUpdate(doc, stored.state);
-      }
-      for (const update of stored.updates) {
-        Y.applyUpdate(doc, update.data);
-      }
-      const indexedUpdateId = stored.updates.at(-1)?.id ?? stored.snapshotUpdateId;
+      applyStored(doc, stored);
+      const indexedUpdateId = lastUpdateIdOf(stored);
       const written = await this.search.upsert(
         documentId,
         document.title,

@@ -11,7 +11,7 @@ import { isUniqueViolation } from '../../common/prisma-errors.js';
 import type { User } from '../../generated/prisma/client.js';
 import { UsersService } from '../users/users.service.js';
 import type { LoginDto, RegisterDto } from './auth.dto.js';
-import { type RefreshClient, TokenService } from './token.service.js';
+import { TokenService } from './token.service.js';
 
 export interface AuthResult {
   user: User;
@@ -61,11 +61,11 @@ export class AuthService implements OnModuleInit {
     return { user, tokens: await this.tokens.issue(user) };
   }
 
-  refresh(refreshToken: string | undefined, client: RefreshClient): Promise<AuthResult> {
+  refresh(refreshToken: string | undefined): Promise<AuthResult> {
     if (!refreshToken) {
       throw new UnauthorizedException('Missing refresh token');
     }
-    return this.tokens.rotate(refreshToken, client);
+    return this.tokens.rotate(refreshToken);
   }
 
   async logout(refreshToken: string | undefined) {

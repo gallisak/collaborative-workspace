@@ -179,16 +179,19 @@ describe('Auth (e2e)', () => {
       }
     });
 
-    it('treats a quick reuse from another device as theft', async () => {
-      const { setCookies } = await registerUser(app);
-      const stolen = sessionCookies(setCookies);
-      const rotated = await refresh(stolen).set('User-Agent', 'Owner browser').expect(200);
-      const owner = sessionCookies(rotated.get('Set-Cookie') ?? []);
+    it('does not treat a refresh racing a logout as theft', async () => {
+      const { email, setCookies } = await registerUser(app);
+      const laptop = sessionCookies(setCookies);
+      const phoneLogin = await post('/api/auth/login')
+        .send({ email, password: PASSWORD })
+        .expect(200);
+      const phone = sessionCookies(phoneLogin.get('Set-Cookie') ?? []);
 
-      await refresh(stolen).set('User-Agent', 'Attacker tool').expect(401);
+      await post('/api/auth/logout').set('Cookie', laptop).expect(204);
+      await refresh(laptop).expect(401);
 
-      await refresh(owner).set('User-Agent', 'Owner browser').expect(401);
-      await me(owner).expect(401);
+      await me(phone).expect(200);
+      await refresh(phone).expect(200);
     });
 
     it('treats a late reuse as theft and revokes the session and access tokens', async () => {

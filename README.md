@@ -78,7 +78,9 @@ database), `.env.staging.example` (staging). The backend loads `.env.${NODE_ENV}
   edits pages, Viewer reads. Invitations by email, role changes, leaving and deleting a workspace.
 - **Page-level sharing.** A page and its subpages can be shared with any user as `VIEW` or `EDIT`;
   the nearest grant up the tree overrides the workspace role in both directions. People outside the
-  workspace find such pages under "Shared with you".
+  workspace find such pages under "Shared with you". Because grants are inherited, only an admin can
+  delete or move pages in a way that changes someone else's access (deleting a subtree with view-only
+  subpages, moving a page out of or into a shared section).
 - **Pages.** Nested pages, drag & drop reordering in the tree.
 - **Editor.** Paragraphs, headings, lists, checklists, code blocks, links and images; live cursors
   and presence; works offline and syncs when the connection returns.
@@ -113,9 +115,9 @@ docker/      container init scripts, nginx ingress config
   authority for users and permissions, and three processes plus the Next.js server need to verify
   a session. A signed access token (15 min) is verified locally by each of them from an `httpOnly`
   cookie, without a session store; the WebSocket gateway reads the same cookie. Refresh tokens
-  (30 days) rotate on every use, and reusing a rotated one revokes the whole session. Two tabs that
-  refresh at the same moment are told apart from theft by a short grace window that only accepts
-  the same device (IP and browser) that rotated the token.
+  (30 days) rotate on every use, and reusing a rotated one revokes the whole session. A 10 second
+  grace window lets two tabs refresh at the same moment without being taken for theft; a token
+  revoked by logout is simply rejected.
 
 `frontend/pages/` is intentionally empty, otherwise Next.js would treat the FSD `src/pages` layer
 as the Pages Router.

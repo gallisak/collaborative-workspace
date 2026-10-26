@@ -1,24 +1,5 @@
 import { issuedAtMs, issuedBeforeRevocation } from './access-token-revocation.service.js';
-import { canReuseRotated, isWithinRotationGrace } from './token-rules.js';
-
-describe('canReuseRotated', () => {
-  const now = new Date('2026-10-19T12:00:10Z');
-  const rotation = { rotatedAt: new Date('2026-10-19T12:00:05Z'), rotatedFrom: 'tab-device' };
-
-  it('lets another tab of the same device refresh right after rotation', () => {
-    expect(canReuseRotated(rotation, 'tab-device', now, 10)).toBe(true);
-  });
-
-  it('treats a reuse from another device as theft even inside the grace window', () => {
-    expect(canReuseRotated(rotation, 'other-device', now, 10)).toBe(false);
-  });
-
-  it('treats a late reuse from the same device as theft', () => {
-    expect(canReuseRotated(rotation, 'tab-device', new Date('2026-10-19T12:00:30Z'), 10)).toBe(
-      false,
-    );
-  });
-});
+import { isWithinRotationGrace } from './token-rules.js';
 
 describe('isWithinRotationGrace', () => {
   const now = new Date('2026-10-19T12:00:10Z');

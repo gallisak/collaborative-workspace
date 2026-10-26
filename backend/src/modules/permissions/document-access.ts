@@ -1,3 +1,4 @@
+import type { Prisma } from '../../generated/prisma/client.js';
 import type { AccessLevel, WorkspaceRole } from '../../generated/prisma/enums.js';
 
 export type DocumentAccess = 'NONE' | 'VIEW' | 'EDIT' | 'MANAGE';
@@ -52,6 +53,11 @@ export const canEdit = (access: DocumentAccess) => hasAccess(access, 'EDIT');
 export const canManage = (access: DocumentAccess) => hasAccess(access, 'MANAGE');
 
 export const SHARE_TOKEN_PATTERN = /^[\w-]{32}$/;
+
+export const activeShareLinkWhere = (now: Date): Prisma.ShareLinkWhereInput => ({
+  revokedAt: null,
+  OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+});
 
 export function isShareLinkActive(
   link: { revokedAt: Date | null; expiresAt: Date | null },

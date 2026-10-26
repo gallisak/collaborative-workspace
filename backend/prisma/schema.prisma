@@ -84,15 +84,14 @@ model User {
 }
 
 model RefreshToken {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  tokenHash   String    @unique @map("token_hash")
-  familyId    String    @map("family_id") @db.Uuid
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
-  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(3)
-  rotatedAt   DateTime? @map("rotated_at") @db.Timestamptz(3)
-  rotatedFrom String?   @map("rotated_from")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  familyId  String    @map("family_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  rotatedAt DateTime? @map("rotated_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -324,8 +323,9 @@ model Comment {
 }
 
 model CommentMention {
-  commentId String @map("comment_id") @db.Uuid
-  userId    String @map("user_id") @db.Uuid
+  commentId  String    @map("comment_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  notifiedAt DateTime? @map("notified_at") @db.Timestamptz(3)
 
   comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)

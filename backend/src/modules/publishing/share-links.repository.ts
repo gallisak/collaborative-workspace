@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AccessLevel } from '../../generated/prisma/enums.js';
 import { PrismaRepository } from '../../infra/prisma/unit-of-work.js';
+import { activeShareLinkWhere } from '../permissions/document-access.js';
 
 const linkSelect = {
   id: true,
@@ -28,8 +29,7 @@ export class ShareLinksRepository extends PrismaRepository {
     return this.prisma.shareLink.findMany({
       where: {
         documentId,
-        revokedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        ...activeShareLinkWhere(now),
       },
       orderBy: { createdAt: 'desc' },
       select: linkSelect,

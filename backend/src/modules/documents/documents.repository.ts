@@ -87,6 +87,32 @@ export class DocumentsRepository extends PrismaRepository {
     return rows[0]?.found ?? false;
   }
 
+  async ancestorIds(startId: string | null, tx: Transaction): Promise<string[]> {
+    if (startId === null) {
+      return [];
+    }
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE chain AS (
+        SELECT id, parent_id, 0 AS depth FROM documents WHERE id = ${startId}::uuid
+        UNION ALL
+        SELECT d.id, d.parent_id, chain.depth + 1
+        FROM documents d JOIN chain ON d.id = chain.parent_id
+        WHERE chain.depth < ${MAX_TREE_DEPTH}
+      )
+      SELECT id FROM chain`;
+    return rows.map((row) => row.id);
+  }
+
+  async hasGrants(documentIds: string[], tx: Transaction) {
+    if (documentIds.length === 0) {
+      return false;
+    }
+    const count = await tx.documentPermission.count({
+      where: { documentId: { in: documentIds } },
+    });
+    return count > 0;
+  }
+
   async subtreeIds(rootId: string) {
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       WITH RECURSIVE subtree AS (

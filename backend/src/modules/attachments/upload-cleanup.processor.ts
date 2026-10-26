@@ -7,6 +7,7 @@ import type { Env } from '../../infra/config/env.schema.js';
 import {
   ATTACHMENTS_QUEUE,
   AttachmentJob,
+  type PurgeDocumentsJob,
   type PurgeWorkspaceJob,
 } from '../../infra/queue/attachment-jobs.js';
 import { TracedWorkerHost } from '../../infra/queue/traced-job.js';
@@ -15,6 +16,7 @@ import { objectKey } from './attachment-rules.js';
 import { AttachmentsRepository } from './attachments.repository.js';
 
 const BATCH = 500;
+const CLEANUP_GRACE_MS = 10 * 60_000;
 
 @Processor(ATTACHMENTS_QUEUE)
 export class UploadCleanupProcessor extends TracedWorkerHost implements OnApplicationBootstrap {
@@ -48,9 +50,21 @@ export class UploadCleanupProcessor extends TracedWorkerHost implements OnApplic
         return this.cleanupUploads();
       case AttachmentJob.PurgeWorkspace:
         return this.purgeWorkspace(job.data as PurgeWorkspaceJob);
+      case AttachmentJob.PurgeDocuments:
+        return this.purgeDocuments(job.data as PurgeDocumentsJob);
       default:
         throw new Error(`Unknown attachments job ${job.name}`);
     }
+  }
+
+  private async purgeDocuments({ documentIds }: PurgeDocumentsJob) {
+    const attachments = await this.attachments.findOfDeletedDocuments(documentIds);
+    if (attachments.length === 0) {
+      return;
+    }
+    await this.storage.delete(attachments.map((attachment) => attachment.objectKey));
+    await this.attachments.deleteByIds(attachments.map((attachment) => attachment.id));
+    this.logger.log({ removed: attachments.length }, 'Images of deleted pages removed');
   }
 
   private async purgeWorkspace({ workspaceId }: PurgeWorkspaceJob) {
@@ -60,7 +74,7 @@ export class UploadCleanupProcessor extends TracedWorkerHost implements OnApplic
 
   private async cleanupUploads() {
     const abandoned = await this.attachments.findAbandoned(
-      new Date(Date.now() - this.uploadWindowMs),
+      new Date(Date.now() - this.uploadWindowMs - CLEANUP_GRACE_MS),
       BATCH,
     );
     if (abandoned.length === 0) {

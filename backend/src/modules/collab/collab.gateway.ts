@@ -21,7 +21,7 @@ import { ACCESS_CHANGED_CHANNEL } from '../../infra/collab-events/collab-events.
 import type { Env } from '../../infra/config/env.schema.js';
 import { REDIS } from '../../infra/redis/redis.module.js';
 import { TokenService } from '../auth/token.service.js';
-import { canEdit } from '../permissions/document-access.js';
+import { canEdit, type DocumentAccess } from '../permissions/document-access.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import { UsersService } from '../users/users.service.js';
 import { CollabJobsProcessor } from './collab-jobs.processor.js';
@@ -49,6 +49,7 @@ class ConnectionRejected extends Error {
 }
 
 const MAX_TIMER_MS = 2 ** 31 - 1;
+const RECHECK_CONCURRENCY = 10;
 
 const toBytes = (data: RawData): Uint8Array =>
   data instanceof ArrayBuffer
@@ -287,8 +288,20 @@ export class CollabGateway
   }
 
   private async recheckClients(sessions: { room: Room; client: CollabClient }[]) {
+    const groups = new Map<string, { room: Room; clients: CollabClient[] }>();
     for (const { room, client } of sessions) {
-      await this.recheck(room, client);
+      const key = `${room.documentId}:${client.user.id}:${client.shareToken ?? ''}`;
+      const group = groups.get(key) ?? { room, clients: [] };
+      group.clients.push(client);
+      groups.set(key, group);
+    }
+    const pending = [...groups.values()];
+    for (let start = 0; start < pending.length; start += RECHECK_CONCURRENCY) {
+      await Promise.all(
+        pending
+          .slice(start, start + RECHECK_CONCURRENCY)
+          .map(({ room, clients }) => this.recheckGroup(room, clients)),
+      );
     }
   }
 
@@ -297,38 +310,50 @@ export class CollabGateway
     client.expiry = undefined;
     if (at) {
       const delay = Math.min(Math.max(0, at.getTime() - Date.now()), MAX_TIMER_MS);
-      client.expiry = setTimeout(() => void this.recheck(room, client), delay);
+      client.expiry = setTimeout(() => void this.recheckGroup(room, [client]), delay);
     }
   }
 
-  private async recheck(room: Room, client: CollabClient) {
-    if (client.socket.readyState !== client.socket.OPEN) {
+  private async recheckGroup(room: Room, clients: CollabClient[]) {
+    const open = clients.filter((client) => client.socket.readyState === client.socket.OPEN);
+    const [first] = open;
+    if (!first) {
       return;
     }
     try {
-      if (await this.tokens.isAccessTokenRevoked(client.accessToken)) {
-        client.socket.close(CloseCode.Unauthorized, 'Session ended');
-        return;
-      }
-      const resolved = await this.access(room.documentId, client.user.id, client.shareToken);
-      const canWrite = canEdit(resolved.access);
-      if (canWrite !== client.canWrite) {
-        client.canWrite = canWrite;
-        client.socket.close(CloseCode.AccessChanged, 'Access level changed');
-        return;
-      }
-      this.scheduleExpiry(room, client, resolved.linkExpiresAt);
+      const resolved = await this.access(room.documentId, first.user.id, first.shareToken);
+      await Promise.all(open.map((client) => this.applyAccess(room, client, resolved)));
     } catch (error) {
       if (error instanceof NotFoundException) {
-        client.canWrite = false;
-        client.socket.close(CloseCode.NotFound, 'Access revoked or document deleted');
+        for (const client of open) {
+          client.canWrite = false;
+          client.socket.close(CloseCode.NotFound, 'Access revoked or document deleted');
+        }
         return;
       }
       this.logger.warn(
-        { err: error, documentId: room.documentId, userId: client.user.id },
+        { err: error, documentId: room.documentId, userId: first.user.id },
         'Access recheck failed',
       );
     }
+  }
+
+  private async applyAccess(
+    room: Room,
+    client: CollabClient,
+    resolved: { access: DocumentAccess; linkExpiresAt: Date | null },
+  ) {
+    if (await this.tokens.isAccessTokenRevoked(client.accessToken)) {
+      client.socket.close(CloseCode.Unauthorized, 'Session ended');
+      return;
+    }
+    const canWrite = canEdit(resolved.access);
+    if (canWrite !== client.canWrite) {
+      client.canWrite = canWrite;
+      client.socket.close(CloseCode.AccessChanged, 'Access level changed');
+      return;
+    }
+    this.scheduleExpiry(room, client, resolved.linkExpiresAt);
   }
 
   private checkHeartbeats() {

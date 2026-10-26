@@ -10,6 +10,7 @@ import {
   type RevalidatePageJob,
 } from '../../infra/queue/publishing-jobs.js';
 import { traced } from '../../infra/queue/traced-job.js';
+import { activeShareLinkWhere } from '../permissions/document-access.js';
 
 @Injectable()
 export class PageRevalidationService {
@@ -30,8 +31,7 @@ export class PageRevalidationService {
       const published = await this.prisma.shareLink.findMany({
         where: {
           documentId: { in: [...documentIds] },
-          revokedAt: null,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+          ...activeShareLinkWhere(now),
         },
         distinct: ['documentId'],
         select: { documentId: true },

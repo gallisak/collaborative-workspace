@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { PlanTier } from '../../generated/prisma/enums.js';
 import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-work.js';
+import { ofLiveDocuments } from '../attachments/attachments.repository.js';
 import type { WorkspaceUsage } from './plan-fit.js';
 
 export interface NewBillingEvent {
@@ -34,7 +35,7 @@ export class BillingRepository extends PrismaRepository {
       db.workspaceMember.count({ where: { workspaceId } }),
       db.document.count({ where: { workspaceId, deletedAt: null } }),
       db.attachment.aggregate({
-        where: { workspaceId, status: 'UPLOADED' },
+        where: { workspaceId, status: 'UPLOADED', ...ofLiveDocuments },
         _sum: { sizeBytes: true },
       }),
     ]);
@@ -142,6 +143,10 @@ export class BillingRepository extends PrismaRepository {
     await tx.checkoutSession.update({
       where: { id: sessionId },
       data: { status: 'COMPLETED', completedAt: new Date() },
+    });
+    await tx.checkoutSession.updateMany({
+      where: { workspaceId, status: 'OPEN', id: { not: sessionId } },
+      data: { status: 'EXPIRED' },
     });
   }
 

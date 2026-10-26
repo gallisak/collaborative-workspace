@@ -264,6 +264,20 @@ describe('Billing (e2e)', () => {
     await owner.post(`/api/billing/checkout-sessions/${session.id}/pay`).expect(409);
   });
 
+  it('closes the other open checkouts once one is paid', async () => {
+    const { owner, workspaceId } = await setup();
+    const team = await startCheckout(owner, workspaceId, 'TEAM');
+    const pro = await startCheckout(owner, workspaceId, 'PRO');
+
+    await owner.post(`/api/billing/checkout-sessions/${team.id}/pay`).expect(202);
+    await eventually(async () => (await planOf(workspaceId)) === 'TEAM');
+
+    const stale = await owner.get(`/api/billing/checkout-sessions/${pro.id}`).expect(200);
+    expect(stale.body.status).toBe('EXPIRED');
+    await owner.post(`/api/billing/checkout-sessions/${pro.id}/pay`).expect(400);
+    expect(await planOf(workspaceId)).toBe('TEAM');
+  });
+
   it('lists the plans', async () => {
     const { owner } = await setup();
     const res = await owner.get('/api/billing/plans').expect(200);

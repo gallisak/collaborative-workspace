@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-work.js';
+import { activeShareLinkWhere } from '../permissions/document-access.js';
+
+export const ofLiveDocuments: Prisma.AttachmentWhereInput = {
+  OR: [{ documentId: null }, { document: { deletedAt: null } }],
+};
 
 export interface NewAttachment {
   workspaceId: string;
@@ -17,7 +23,10 @@ export class AttachmentsRepository extends PrismaRepository {
     const { _sum } = await tx.attachment.aggregate({
       where: {
         workspaceId,
-        OR: [{ status: 'UPLOADED' }, { status: 'PENDING', createdAt: { gt: pendingSince } }],
+        AND: [
+          ofLiveDocuments,
+          { OR: [{ status: 'UPLOADED' }, { status: 'PENDING', createdAt: { gt: pendingSince } }] },
+        ],
       },
       _sum: { sizeBytes: true },
     });
@@ -26,7 +35,7 @@ export class AttachmentsRepository extends PrismaRepository {
 
   async uploadedBytes(workspaceId: string) {
     const { _sum } = await this.prisma.attachment.aggregate({
-      where: { workspaceId, status: 'UPLOADED' },
+      where: { workspaceId, status: 'UPLOADED', ...ofLiveDocuments },
       _sum: { sizeBytes: true },
     });
     return _sum.sizeBytes ?? 0n;
@@ -55,8 +64,7 @@ export class AttachmentsRepository extends PrismaRepository {
     const count = await this.prisma.shareLink.count({
       where: {
         documentId,
-        revokedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        ...activeShareLinkWhere(now),
         document: { deletedAt: null },
       },
     });
@@ -69,6 +77,17 @@ export class AttachmentsRepository extends PrismaRepository {
       select: { id: true, objectKey: true },
       take: limit,
     });
+  }
+
+  findOfDeletedDocuments(documentIds: string[]) {
+    return this.prisma.attachment.findMany({
+      where: { documentId: { in: documentIds }, document: { deletedAt: { not: null } } },
+      select: { id: true, objectKey: true },
+    });
+  }
+
+  deleteByIds(ids: string[]) {
+    return this.prisma.attachment.deleteMany({ where: { id: { in: ids } } });
   }
 
   deleteMany(ids: string[]) {

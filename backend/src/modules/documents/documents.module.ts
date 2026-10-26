@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AttachmentsPurgeModule } from '../attachments/attachments-purge.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { PermissionsModule } from '../permissions/permissions.module.js';
 import { PageRevalidationModule } from '../publishing/page-revalidation.module.js';
@@ -22,6 +23,7 @@ import { TreeCacheService } from './tree-cache.service.js';
     PageRevalidationModule,
     SearchIndexingModule,
     NotificationsModule,
+    AttachmentsPurgeModule,
   ],
   controllers: [WorkspaceDocumentsController, SharedDocumentsController, DocumentsController],
   providers: [DocumentsService, DocumentsRepository, TreeCacheService],

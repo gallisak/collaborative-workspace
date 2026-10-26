@@ -86,13 +86,12 @@ describe('sessionProxy', () => {
     expect(response.headers.get('x-middleware-request-cookie')).toContain(`access_token=${fresh}`);
   });
 
-  it('sends the address and browser of the visitor with the refresh', async () => {
+  it('sends the address of the visitor with the refresh', async () => {
     fetchMock.mockResolvedValue(refreshResponse(true));
     const visitor = new NextRequest('http://app.test/workspaces', {
       headers: {
         cookie: `access_token=${expired}; refresh_token=old`,
         'x-forwarded-for': '203.0.113.7',
-        'user-agent': 'Browser/1.0',
       },
     });
 
@@ -105,13 +104,12 @@ describe('sessionProxy', () => {
           cookie: 'refresh_token=old',
           origin: 'http://app.test',
           'x-forwarded-for': '203.0.113.7',
-          'user-agent': 'Browser/1.0',
         },
       }),
     );
   });
 
-    it('signs the user out when the refresh token is rejected', async () => {
+  it('signs the user out when the refresh token is rejected', async () => {
     fetchMock.mockResolvedValue(refreshResponse(false));
 
     const response = await sessionProxy(request('/w/1', { refresh_token: 'revoked' }), options);

@@ -8,6 +8,7 @@ import {
 import { generateKeyBetween } from 'fractional-indexing';
 import type { Document } from '../../generated/prisma/client.js';
 import { CollabEventsService } from '../../infra/collab-events/collab-events.service.js';
+import { AttachmentsPurgeService } from '../attachments/attachments-purge.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { type Transaction, UnitOfWork } from '../../infra/prisma/unit-of-work.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
@@ -56,6 +57,7 @@ export class DocumentsService {
     private readonly pages: PageRevalidationService,
     private readonly search: SearchIndexingService,
     private readonly notifications: NotificationsService,
+    private readonly attachments: AttachmentsPurgeService,
   ) {}
 
   async tree(userId: string, workspaceId: string): Promise<DocumentNodeDto[]> {
@@ -118,10 +120,21 @@ export class DocumentsService {
     const { workspaceId } = document;
     await this.uow.run(async (tx) => {
       await this.lockWorkspace(workspaceId, tx);
-      if (!(await this.documents.findActive(documentId, tx))) {
+      const current = await this.documents.findActive(documentId, tx);
+      if (!current) {
         throw new NotFoundException('Document not found');
       }
       await this.assertCanPlaceUnder(userId, workspaceId, dto.parentId, tx);
+      const { access } = await this.documentAccess.require(documentId, userId, 'EDIT', tx);
+      if (
+        !canManage(access) &&
+        current.parentId !== dto.parentId &&
+        (await this.changesInheritedGrants(current.parentId, dto.parentId, tx))
+      ) {
+        throw new ForbiddenException(
+          'Moving this page changes who can access it, ask a workspace admin to move it',
+        );
+      }
       if (
         dto.parentId !== null &&
         (await this.documents.isSelfOrAncestor(documentId, dto.parentId, tx))
@@ -164,6 +177,7 @@ export class DocumentsService {
     await this.treeCache.invalidate(document.workspaceId);
     await this.collabEvents.accessChanged(document.workspaceId);
     await this.pages.scheduleIfPublished(deleted);
+    await this.attachments.purgeDocuments(deleted);
     this.logger.log(
       { workspaceId: document.workspaceId, documentId, deleted: deleted.length, userId },
       'Document deleted',
@@ -202,6 +216,18 @@ export class DocumentsService {
     }
     await this.collabEvents.accessChanged(document.workspaceId);
     await this.notifications.pruneInaccessible(targetUserId, document.workspaceId);
+  }
+
+  private async changesInheritedGrants(
+    fromParentId: string | null,
+    toParentId: string | null,
+    tx: Transaction,
+  ) {
+    const from = await this.documents.ancestorIds(fromParentId, tx);
+    const to = await this.documents.ancestorIds(toParentId, tx);
+    const shared = new Set(from.filter((id) => to.includes(id)));
+    const changed = [...from, ...to].filter((id) => !shared.has(id));
+    return this.documents.hasGrants(changed, tx);
   }
 
   private async assertCanPlaceUnder(

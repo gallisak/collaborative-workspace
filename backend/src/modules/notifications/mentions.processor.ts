@@ -50,6 +50,7 @@ export class MentionsProcessor extends TracedWorkerHost implements OnApplication
   async notify(commentId: string) {
     const comment = await this.notifications.findMentionSource(commentId);
     if (!comment) {
+      await this.notifications.markMentionsProcessed(commentId, new Date());
       this.logger.warn({ commentId }, 'Skipping mentions of a deleted comment');
       return;
     }
@@ -71,20 +72,24 @@ export class MentionsProcessor extends TracedWorkerHost implements OnApplication
         dedupeKey: mentionDedupeKey(commentId, userId),
       })),
     );
+    await this.notifications.markMentionsProcessed(commentId, new Date());
     this.logger.log({ commentId, documentId: document.id, created: count }, 'Mentions notified');
   }
 
   private async reconcile() {
     const now = Date.now();
-    const commentIds = await this.notifications.undeliveredMentionComments(
+    const commentIds = await this.notifications.unprocessedMentionComments(
       new Date(now - RECONCILE_WINDOW_MS),
       new Date(now - RECONCILE_GRACE_MS),
       RECONCILE_BATCH,
     );
+    const run = Math.floor(now / RECONCILE_EVERY_MS);
     await Promise.all(
       commentIds.map((commentId) => {
         const job: NotifyMentionsJob = { commentId };
-        return this.queue.add(NotificationJob.NotifyMentions, traced(job), { jobId: commentId });
+        return this.queue.add(NotificationJob.NotifyMentions, traced(job), {
+          jobId: `${commentId}:reconcile:${run}`,
+        });
       }),
     );
     if (commentIds.length > 0) {

@@ -16,7 +16,6 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from '../../common/auth/auth-cookies.js
 import type { AuthUser, IssuedTokens } from '../../common/auth/auth.types.js';
 import { CurrentUser, Public } from '../../common/auth/decorators.js';
 import type { Env } from '../../infra/config/env.schema.js';
-import { clientIp } from '../../infra/throttling/login-throttle.js';
 import { PublicUser } from '../users/user.dto.js';
 import { UsersService } from '../users/users.service.js';
 import { AuthResponseDto, LoginDto, RegisterDto } from './auth.dto.js';
@@ -69,8 +68,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
     try {
-      const client = { ip: clientIp(req), userAgent: req.get('user-agent') ?? '' };
-      return this.respond(await this.auth.refresh(this.refreshTokenFrom(req), client), res);
+      return this.respond(await this.auth.refresh(this.refreshTokenFrom(req)), res);
     } catch (error) {
       this.clearSession(res);
       throw error;
