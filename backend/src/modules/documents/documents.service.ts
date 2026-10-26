@@ -1,10 +1,17 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { generateKeyBetween } from 'fractional-indexing';
 import type { Document } from '../../generated/prisma/client.js';
 import { CollabEventsService } from '../../infra/collab-events/collab-events.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { type Transaction, UnitOfWork } from '../../infra/prisma/unit-of-work.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
-import type { DocumentAccess } from '../permissions/document-access.js';
+import { canManage, type DocumentAccess } from '../permissions/document-access.js';
 import { PageRevalidationService } from '../publishing/page-revalidation.service.js';
 import { SearchIndexingService } from '../search/search-indexing.service.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
@@ -18,6 +25,7 @@ import type {
   DocumentPermissionDto,
   MoveDocumentDto,
   ShareDocumentDto,
+  SharedDocumentDto,
 } from './documents.dto.js';
 import { DocumentsRepository } from './documents.repository.js';
 import { TreeCacheService } from './tree-cache.service.js';
@@ -47,11 +55,23 @@ export class DocumentsService {
     private readonly collabEvents: CollabEventsService,
     private readonly pages: PageRevalidationService,
     private readonly search: SearchIndexingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async tree(userId: string, workspaceId: string): Promise<DocumentNodeDto[]> {
     await this.workspaceAccess.requireMember(workspaceId, userId);
     return this.treeCache.get(workspaceId, () => this.documents.listTree(workspaceId));
+  }
+
+  async sharedWith(userId: string): Promise<SharedDocumentDto[]> {
+    const grants = await this.documents.listSharedWith(userId);
+    return grants.map(({ accessLevel, document }) => ({
+      id: document.id,
+      workspaceId: document.workspaceId,
+      workspaceName: document.workspace.name,
+      title: document.title,
+      accessLevel,
+    }));
   }
 
   async get(userId: string, documentId: string): Promise<DocumentDto> {
@@ -117,6 +137,11 @@ export class DocumentsService {
     });
     await this.treeCache.invalidate(workspaceId);
     await this.collabEvents.accessChanged(workspaceId);
+    await this.documents.subtreeIds(documentId).then(
+      (documentIds) => this.notifications.pruneForDocuments(workspaceId, documentIds),
+      (error: unknown) =>
+        this.logger.warn({ err: error, documentId }, 'Pruning notifications after a move failed'),
+    );
     this.logger.log({ workspaceId, documentId, parentId: dto.parentId, userId }, 'Document moved');
     return this.get(userId, documentId);
   }
@@ -125,6 +150,15 @@ export class DocumentsService {
     const { document } = await this.documentAccess.require(documentId, userId, 'EDIT');
     const deleted = await this.uow.run(async (tx) => {
       await this.lockWorkspace(document.workspaceId, tx);
+      const { access } = await this.documentAccess.require(documentId, userId, 'EDIT', tx);
+      if (
+        !canManage(access) &&
+        (await this.documents.hasReadOnlyDescendant(documentId, userId, tx))
+      ) {
+        throw new ForbiddenException(
+          'Some subpages are view-only for you, ask a workspace admin to delete this page',
+        );
+      }
       return this.documents.softDeleteSubtree(documentId, new Date(), tx);
     });
     await this.treeCache.invalidate(document.workspaceId);
@@ -167,6 +201,7 @@ export class DocumentsService {
       throw new NotFoundException('Permission not found');
     }
     await this.collabEvents.accessChanged(document.workspaceId);
+    await this.notifications.pruneInaccessible(targetUserId, document.workspaceId);
   }
 
   private async assertCanPlaceUnder(

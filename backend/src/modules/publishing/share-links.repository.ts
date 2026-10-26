@@ -43,6 +43,10 @@ export class ShareLinksRepository extends PrismaRepository {
     });
   }
 
+  delete(linkId: string) {
+    return this.prisma.shareLink.delete({ where: { id: linkId } });
+  }
+
   revoke(linkId: string) {
     return this.prisma.shareLink.update({
       where: { id: linkId },

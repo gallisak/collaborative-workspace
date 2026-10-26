@@ -5,12 +5,24 @@ import { publicEnv } from '@/shared/config';
 import { type Collaborator, collaboratorsFrom } from './presence';
 
 export const CloseCode = {
+  BadRequest: 4400,
   Unauthorized: 4401,
   Forbidden: 4403,
   NotFound: 4404,
+  AccessChanged: 4409,
 } as const;
 
-export type ConnectionState = 'connecting' | 'online' | 'offline' | 'unauthorized' | 'lost-access';
+export type ConnectionState =
+  | 'connecting'
+  | 'online'
+  | 'offline'
+  | 'unauthorized'
+  | 'lost-access'
+  | 'access-changed'
+  | 'failed';
+
+const MAX_RESYNC_ATTEMPTS = 3;
+const RESYNC_DELAY_MS = 1000;
 
 export interface SessionSnapshot {
   state: ConnectionState;
@@ -25,6 +37,7 @@ export class CollabSession {
   private people: Collaborator[] = [];
   private readonly peopleListeners = new Set<() => void>();
   private browserOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+  private resyncAttempts = 0;
 
   constructor(
     readonly documentId: string,
@@ -42,9 +55,12 @@ export class CollabSession {
       }
       this.set({ state: status === 'connected' ? 'online' : this.disconnectedState() });
     });
-    this.provider.on('sync', (synced: boolean) =>
-      this.set({ synced: synced || this.snapshot.synced }),
-    );
+    this.provider.on('sync', (synced: boolean) => {
+      if (synced) {
+        this.resyncAttempts = 0;
+      }
+      this.set({ synced: synced || this.snapshot.synced });
+    });
     this.provider.on('connection-close', (event) => this.onClose(event?.code));
     this.provider.awareness.on('change', this.onAwareness);
     window.addEventListener('online', this.onNetworkChange);
@@ -103,6 +119,21 @@ export class CollabSession {
       this.set({ state: 'lost-access' });
       return;
     }
+    if (code === CloseCode.AccessChanged) {
+      this.provider.disconnect();
+      this.set({ state: 'access-changed' });
+      return;
+    }
+    if (code === CloseCode.BadRequest) {
+      this.provider.disconnect();
+      if (this.resyncAttempts >= MAX_RESYNC_ATTEMPTS) {
+        this.set({ state: 'failed' });
+        return;
+      }
+      this.resyncAttempts++;
+      window.setTimeout(() => this.connect(), RESYNC_DELAY_MS * this.resyncAttempts);
+      return;
+    }
     if (code === CloseCode.Unauthorized) {
       this.provider.disconnect();
       if (await refreshSession()) {
@@ -118,7 +149,9 @@ export class CollabSession {
   }
 
   private isTerminal() {
-    return this.snapshot.state === 'lost-access' || this.snapshot.state === 'unauthorized';
+    return ['lost-access', 'unauthorized', 'access-changed', 'failed'].includes(
+      this.snapshot.state,
+    );
   }
 
   private set(patch: Partial<SessionSnapshot>) {

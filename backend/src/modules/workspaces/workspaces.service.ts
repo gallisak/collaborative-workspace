@@ -1,7 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CollabEventsService } from '../../infra/collab-events/collab-events.service.js';
 import { UnitOfWork } from '../../infra/prisma/unit-of-work.js';
+import { AttachmentsPurgeService } from '../attachments/attachments-purge.service.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
+import { PageRevalidationService } from '../publishing/page-revalidation.service.js';
 import type { WorkspaceDetailsDto, WorkspaceSummaryDto } from './workspaces.dto.js';
 import { WorkspacesRepository } from './workspaces.repository.js';
 
@@ -14,6 +16,8 @@ export class WorkspacesService {
     private readonly access: WorkspaceAccessService,
     private readonly uow: UnitOfWork,
     private readonly collabEvents: CollabEventsService,
+    private readonly pages: PageRevalidationService,
+    private readonly attachments: AttachmentsPurgeService,
   ) {}
 
   async create(userId: string, name: string): Promise<WorkspaceSummaryDto> {
@@ -62,8 +66,17 @@ export class WorkspacesService {
 
   async remove(userId: string, workspaceId: string) {
     await this.access.requireRole(workspaceId, userId, 'OWNER');
-    await this.workspaces.delete(workspaceId);
+    const published = await this.uow.run(async (tx) => {
+      if (!(await this.workspaces.lockWithPlan(workspaceId, tx))) {
+        throw new NotFoundException('Workspace not found');
+      }
+      const documentIds = await this.workspaces.publishedDocumentIds(workspaceId, new Date(), tx);
+      await this.workspaces.delete(workspaceId, tx);
+      return documentIds;
+    });
     await this.collabEvents.accessChanged(workspaceId);
-    this.logger.log({ workspaceId, userId }, 'Workspace deleted');
+    await this.pages.scheduleAll(published);
+    await this.attachments.purgeWorkspace(workspaceId);
+    this.logger.log({ workspaceId, userId, unpublished: published.length }, 'Workspace deleted');
   }
 }

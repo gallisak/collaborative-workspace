@@ -80,6 +80,13 @@ export class CheckoutSessionDto {
   @ApiProperty({ enum: CheckoutSessionStatus, enumName: 'CheckoutSessionStatus' })
   status: CheckoutSessionStatus;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Why a paid checkout was not applied, set when the status is FAILED',
+  })
+  failureReason: string | null;
+
   @ApiProperty()
   expiresAt: Date;
 

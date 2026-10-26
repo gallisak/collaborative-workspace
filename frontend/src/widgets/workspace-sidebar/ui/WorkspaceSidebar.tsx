@@ -1,11 +1,12 @@
 'use client';
 
-import { CreditCard, Home, Search, Settings } from 'lucide-react';
+import { CreditCard, FileText, Home, Search, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { displayTitle } from '@/entities/document';
 import { NewPageButton } from '@/features/create-document';
-import type { WorkspaceDetails } from '@/shared/api';
+import type { SharedDocument, WorkspaceDetails } from '@/shared/api';
 import { routes } from '@/shared/config';
 import { cn } from '@/shared/lib';
 import { Button } from '@/shared/ui/button';
@@ -17,6 +18,7 @@ interface WorkspaceSidebarProps {
   notifications: ReactNode;
   workspaceId: string;
   workspace: WorkspaceDetails | null;
+  shared: readonly SharedDocument[];
   editable: boolean;
 }
 
@@ -42,8 +44,10 @@ export function WorkspaceSidebar({
   notifications,
   workspaceId,
   workspace,
+  shared,
   editable,
 }: WorkspaceSidebarProps) {
+  const pathname = usePathname();
   return (
     <aside className="bg-sidebar text-sidebar-foreground flex w-64 shrink-0 flex-col gap-2 border-r p-2">
       <Link
@@ -52,6 +56,30 @@ export function WorkspaceSidebar({
       >
         {workspace?.name ?? 'Shared with you'}
       </Link>
+      {!workspace && (
+        <ScrollArea className="-mx-2 min-h-0 flex-1 px-2">
+          <ul aria-label="Pages shared with you" className="grid gap-px">
+            {shared.map((document) => {
+              const href = routes.document(document.workspaceId, document.id);
+              return (
+                <li key={document.id}>
+                  <Link
+                    href={href}
+                    aria-current={pathname === href ? 'page' : undefined}
+                    className={cn(
+                      'hover:bg-sidebar-accent flex h-8 items-center gap-1.5 rounded-md px-2 text-sm',
+                      pathname === href && 'bg-sidebar-accent font-medium',
+                    )}
+                  >
+                    <FileText className="text-muted-foreground size-4 shrink-0" />
+                    <span className="truncate">{displayTitle(document.title)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </ScrollArea>
+      )}
       {workspace && (
         <>
           <nav aria-label="Workspace" className="grid gap-px">

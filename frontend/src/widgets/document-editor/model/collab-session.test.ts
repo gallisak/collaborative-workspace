@@ -84,6 +84,33 @@ describe('CollabSession', () => {
     expect(fake(session).connect).not.toHaveBeenCalled();
   });
 
+  it('stops and asks for a reload when the access level changed', () => {
+    const session = new CollabSession('doc-1');
+    fake(session).emit('connection-close', { code: 4409 });
+
+    expect(fake(session).disconnect).toHaveBeenCalled();
+    expect(session.getSnapshot().state).toBe('access-changed');
+    session.connect();
+    expect(fake(session).connect).not.toHaveBeenCalled();
+  });
+
+  it('resyncs after a rejected message and gives up after repeated failures', () => {
+    vi.useFakeTimers();
+    const session = new CollabSession('doc-1');
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      fake(session).emit('connection-close', { code: 4400 });
+      vi.runAllTimers();
+      expect(fake(session).connect).toHaveBeenCalledTimes(attempt);
+    }
+    fake(session).emit('connection-close', { code: 4400 });
+    vi.runAllTimers();
+
+    expect(fake(session).connect).toHaveBeenCalledTimes(3);
+    expect(session.getSnapshot().state).toBe('failed');
+    vi.useRealTimers();
+  });
+
   it('tracks who else is in the document', () => {
     const session = new CollabSession('doc-1');
     const listener = vi.fn();

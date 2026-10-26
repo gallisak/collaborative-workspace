@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Input } from '@/shared/ui/input';
 import { MAX_TITLE_LENGTH, useRenameDocument } from '../model/use-rename-document';
 
@@ -13,8 +13,12 @@ interface RenameInputProps {
 export function RenameInput({ documentId, title, onDone }: RenameInputProps) {
   const rename = useRenameDocument();
   const [value, setValue] = useState(title);
+  const cancelled = useRef(false);
 
   const commit = async () => {
+    if (cancelled.current) {
+      return;
+    }
     await rename(documentId, value, title);
     onDone();
   };
@@ -34,6 +38,7 @@ export function RenameInput({ documentId, title, onDone }: RenameInputProps) {
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
+          cancelled.current = true;
           onDone();
         }
       }}

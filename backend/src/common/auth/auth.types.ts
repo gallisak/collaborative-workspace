@@ -4,6 +4,7 @@ export interface AuthUser {
 
 export interface AccessTokenPayload {
   sub: string;
+  fid?: string;
   iat?: number;
   iatMs?: number;
   exp?: number;

@@ -236,6 +236,34 @@ describe('Billing (e2e)', () => {
     expect(tooSmall.body.message).toContain('allows up to 10 members, the workspace has 11');
   });
 
+  it('does not apply a paid downgrade when the team outgrew the plan before payment', async () => {
+    const { owner, workspaceId } = await setup();
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { planId: 'TEAM' } });
+    const session = await startCheckout(owner, workspaceId, 'PRO');
+    await prisma.attachment.create({
+      data: {
+        workspaceId,
+        objectKey: `workspaces/${workspaceId}/${randomUUID()}`,
+        fileName: 'huge.png',
+        contentType: 'image/png',
+        sizeBytes: 11n * 1024n ** 3n,
+        status: 'UPLOADED',
+      },
+    });
+
+    await owner.post(`/api/billing/checkout-sessions/${session.id}/pay`).expect(202);
+
+    await eventually(async () => {
+      const stored = await prisma.checkoutSession.findUniqueOrThrow({ where: { id: session.id } });
+      return stored.status === 'FAILED';
+    });
+    expect(await planOf(workspaceId)).toBe('TEAM');
+    const failed = await owner.get(`/api/billing/checkout-sessions/${session.id}`).expect(200);
+    expect(failed.body).toMatchObject({ status: 'FAILED' });
+    expect(failed.body.failureReason).toContain('includes 10 GB of storage');
+    await owner.post(`/api/billing/checkout-sessions/${session.id}/pay`).expect(409);
+  });
+
   it('lists the plans', async () => {
     const { owner } = await setup();
     const res = await owner.get('/api/billing/plans').expect(200);

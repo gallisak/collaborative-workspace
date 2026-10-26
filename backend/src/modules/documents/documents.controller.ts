@@ -30,6 +30,7 @@ import {
   DocumentPermissionDto,
   MoveDocumentDto,
   ShareDocumentDto,
+  SharedDocumentDto,
   UpdateDocumentDto,
 } from './documents.dto.js';
 import { DocumentsService } from './documents.service.js';
@@ -56,6 +57,21 @@ export class WorkspaceDocumentsController {
     @Body() dto: CreateDocumentDto,
   ) {
     return this.documents.create(user.id, workspaceId, dto);
+  }
+}
+
+@ApiTags('documents')
+@Controller('shared-documents')
+export class SharedDocumentsController {
+  constructor(private readonly documents: DocumentsService) {}
+
+  @Get()
+  @ApiOkResponse({
+    type: [SharedDocumentDto],
+    description: 'Pages shared with you in workspaces you are not a member of',
+  })
+  list(@CurrentUser() user: AuthUser) {
+    return this.documents.sharedWith(user.id);
   }
 }
 
@@ -98,7 +114,7 @@ export class DocumentsController {
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse({ description: 'The document and its subpages are deleted' })
-  @ApiForbiddenResponse({ description: 'Requires edit access' })
+  @ApiForbiddenResponse({ description: 'Requires edit access to the document and every subpage' })
   remove(@CurrentUser() user: AuthUser, @Param('documentId', ParseUUIDPipe) documentId: string) {
     return this.documents.remove(user.id, documentId);
   }

@@ -11,6 +11,7 @@ import {
   decideCheckoutCompleted,
 } from './billing-event.js';
 import { BillingRepository } from './billing.repository.js';
+import { planMisfit } from './plan-fit.js';
 
 @Processor(BILLING_QUEUE)
 export class BillingEventsProcessor extends TracedWorkerHost {
@@ -61,6 +62,19 @@ export class BillingEventsProcessor extends TracedWorkerHost {
       if (!previousPlan) {
         await this.billing.markProcessed(eventId, tx);
         this.logger.warn({ eventId }, 'Workspace of the checkout no longer exists');
+        return;
+      }
+      const misfit = planMisfit(
+        await this.billing.findPlan(decision.planId, tx),
+        await this.billing.usage(decision.workspaceId, tx),
+      );
+      if (misfit) {
+        await this.billing.failCheckout(parsed.data.id, misfit, tx);
+        await this.billing.markProcessed(eventId, tx);
+        this.logger.warn(
+          { eventId, workspaceId: decision.workspaceId, planId: decision.planId, reason: misfit },
+          'Plan change rejected, the workspace exceeds the plan limits',
+        );
         return;
       }
       await this.billing.activate(parsed.data.id, decision, tx);

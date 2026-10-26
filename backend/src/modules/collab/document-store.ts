@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaRepository } from '../../infra/prisma/unit-of-work.js';
 
 export interface StoredDocument {
@@ -9,15 +10,20 @@ export interface StoredDocument {
 
 @Injectable()
 export class DocumentStore extends PrismaRepository {
-  async load(documentId: string): Promise<StoredDocument> {
-    const snapshot = await this.prisma.documentState.findUnique({ where: { documentId } });
-    const snapshotUpdateId = snapshot?.lastUpdateId ?? 0n;
-    const updates = await this.prisma.documentUpdate.findMany({
-      where: { documentId, id: { gt: snapshotUpdateId } },
-      orderBy: { id: 'asc' },
-      select: { id: true, data: true },
-    });
-    return { state: snapshot?.state ?? null, snapshotUpdateId, updates };
+  load(documentId: string): Promise<StoredDocument> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const snapshot = await tx.documentState.findUnique({ where: { documentId } });
+        const snapshotUpdateId = snapshot?.lastUpdateId ?? 0n;
+        const updates = await tx.documentUpdate.findMany({
+          where: { documentId, id: { gt: snapshotUpdateId } },
+          orderBy: { id: 'asc' },
+          select: { id: true, data: true },
+        });
+        return { state: snapshot?.state ?? null, snapshotUpdateId, updates };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   async append(documentId: string, data: Uint8Array): Promise<bigint> {

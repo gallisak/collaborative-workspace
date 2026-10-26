@@ -18,6 +18,7 @@ interface CheckoutPageProps {
 const STATUS_TEXT = {
   COMPLETED: 'This checkout is already paid.',
   EXPIRED: 'This checkout has expired. Start a new one from the billing page.',
+  FAILED: 'The plan could not be changed.',
 } as const;
 
 async function Checkout({ params }: CheckoutPageProps) {
@@ -52,7 +53,9 @@ async function Checkout({ params }: CheckoutPageProps) {
             planName={session.plan.name}
           />
         ) : (
-          <p className="text-muted-foreground text-sm">{STATUS_TEXT[session.status]}</p>
+          <p className="text-muted-foreground text-sm">
+            {session.failureReason ?? STATUS_TEXT[session.status]}
+          </p>
         )}
         <Button asChild variant="ghost">
           <Link href={billingPath}>Back to billing</Link>

@@ -5,6 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { MailService } from '../src/infra/mail/mail.service.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
+import { AttachmentJob } from '../src/infra/queue/attachment-jobs.js';
+import { StorageService } from '../src/infra/storage/storage.service.js';
 import { UploadCleanupProcessor } from '../src/modules/attachments/upload-cleanup.processor.js';
 import {
   CapturingMail,
@@ -212,8 +214,27 @@ describe('Attachments (e2e)', () => {
     });
 
     await owner.post(`/api/attachments/${created.attachment.id}/complete`).expect(400);
-    await worker.get(UploadCleanupProcessor).process({} as Job);
+    await worker.get(UploadCleanupProcessor).process({ name: AttachmentJob.CleanupUploads } as Job);
 
     expect(await prisma.attachment.count({ where: { id: created.attachment.id } })).toBe(0);
+  });
+
+  it('removes the files of a deleted workspace from storage', async () => {
+    const { owner, workspaceId, documentId } = await setup();
+    const created = (await requestUpload(owner, documentId, 1024).expect(201)).body as Created;
+    await uploadTo(created, png(1024));
+    await owner.post(`/api/attachments/${created.attachment.id}/complete`).expect(200);
+    const { objectKey } = await prisma.attachment.findUniqueOrThrow({
+      where: { id: created.attachment.id },
+    });
+    const storage = worker.get(StorageService);
+    expect(await storage.head(objectKey)).not.toBeNull();
+
+    await owner.delete(`/api/workspaces/${workspaceId}`).expect(204);
+    await worker
+      .get(UploadCleanupProcessor)
+      .process({ name: AttachmentJob.PurgeWorkspace, data: { workspaceId } } as Job);
+
+    expect(await storage.head(objectKey)).toBeNull();
   });
 });

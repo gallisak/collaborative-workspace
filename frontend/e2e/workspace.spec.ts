@@ -27,6 +27,9 @@ async function newPage(page: Page, title: string, parent?: string) {
 }
 
 async function drag(page: Page, handle: Locator, dx: number, dy: number) {
+  const moved = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && response.url().endsWith('/move'),
+  );
   const box = (await handle.boundingBox())!;
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
@@ -35,6 +38,7 @@ async function drag(page: Page, handle: Locator, dx: number, dy: number) {
   await page.mouse.move(x + 2, y + 2, { steps: 2 });
   await page.mouse.move(x + dx, y + dy, { steps: 12 });
   await page.mouse.up();
+  expect((await moved).ok()).toBe(true);
 }
 
 test.describe('workspace', () => {

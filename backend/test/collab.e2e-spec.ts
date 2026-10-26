@@ -3,6 +3,7 @@ import request from 'supertest';
 import * as Y from 'yjs';
 import { MailService } from '../src/infra/mail/mail.service.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
+import { RoomsService } from '../src/modules/collab/rooms.service.js';
 import { CapturingMail, cleanupE2eData, createTestApp, signUp, type TestUser } from './helpers.js';
 import { eventually, startCollab } from './collab-harness.js';
 
@@ -105,6 +106,27 @@ describe('Collab gateway (e2e)', () => {
     expect(text(second.doc)).toBe('Persisted across sessions');
   });
 
+  it('saves buffered edits and tells clients to reconnect when the gateway shuts down', async () => {
+    const { owner, documentId } = await setup();
+    const gateway = await startCollab();
+    const client = gateway.connect(documentId, { cookies: owner.cookies });
+    await client.synced;
+    const closeCode = new Promise<number | undefined>((resolve) =>
+      client.provider.on('connection-close', (event) => resolve(event?.code)),
+    );
+
+    client.doc.getText('body').insert(0, 'Written right before a restart');
+    await eventually(() => gateway.app.get(RoomsService).stats().rooms === 1);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const stopped = gateway.app.close().then(() => 'stopped');
+    const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), 5000));
+
+    expect(await Promise.race([stopped, timeout])).toBe('stopped');
+    expect(await closeCode).toBe(1012);
+    gateway.disconnectAll();
+    expect(await storedText(documentId)).toBe('Written right before a restart');
+  });
+
   it('compacts the update log into a snapshot', async () => {
     const { owner, documentId } = await setup();
     const client = connect(documentId, { cookies: owner.cookies });
@@ -201,8 +223,11 @@ describe('Collab gateway (e2e)', () => {
     await owner.delete(`/api/workspaces/${workspaceId}/members/${removed.id}`).expect(204);
 
     expect(await removedClient.closedWith).toBe(4404);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    editorClient.doc.getText('body').insert(0, 'after downgrade');
+    expect(await editorClient.closedWith).toBe(4409);
+
+    const reconnected = connect(documentId, { cookies: editor.cookies });
+    await reconnected.synced;
+    reconnected.doc.getText('body').insert(0, 'after downgrade');
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(await storedText(documentId)).toBe('');
   });

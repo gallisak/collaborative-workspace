@@ -19,9 +19,14 @@ async function WorkspaceShell({ params, children }: WorkspaceLayoutProps) {
     getSessionUser(),
     loadOptional((api) => api.GET('/api/workspaces/{workspaceId}', path)),
   ]);
-  const nodes = workspace
-    ? await load((api) => api.GET('/api/workspaces/{workspaceId}/documents', path))
-    : [];
+  const [nodes, shared] = workspace
+    ? [await load((api) => api.GET('/api/workspaces/{workspaceId}/documents', path)), []]
+    : [
+        [],
+        (await load((api) => api.GET('/api/shared-documents'))).filter(
+          (document) => document.workspaceId === workspaceId,
+        ),
+      ];
 
   return (
     <DocumentTreeProvider key={workspaceId} workspaceId={workspaceId} initialNodes={nodes}>
@@ -30,6 +35,7 @@ async function WorkspaceShell({ params, children }: WorkspaceLayoutProps) {
         notifications={<NotificationsBell />}
         workspaceId={workspaceId}
         workspace={workspace}
+        shared={shared}
         editable={workspace ? canEditContent(workspace.role) : false}
       />
       <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>

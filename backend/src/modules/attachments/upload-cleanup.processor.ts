@@ -1,12 +1,17 @@
 import { InjectQueue, Processor } from '@nestjs/bullmq';
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Queue } from 'bullmq';
+import type { Job, Queue } from 'bullmq';
 import { durationToSeconds } from '../../common/duration.js';
 import type { Env } from '../../infra/config/env.schema.js';
-import { ATTACHMENTS_QUEUE, AttachmentJob } from '../../infra/queue/attachment-jobs.js';
+import {
+  ATTACHMENTS_QUEUE,
+  AttachmentJob,
+  type PurgeWorkspaceJob,
+} from '../../infra/queue/attachment-jobs.js';
 import { TracedWorkerHost } from '../../infra/queue/traced-job.js';
 import { StorageService } from '../../infra/storage/storage.service.js';
+import { objectKey } from './attachment-rules.js';
 import { AttachmentsRepository } from './attachments.repository.js';
 
 const BATCH = 500;
@@ -37,7 +42,23 @@ export class UploadCleanupProcessor extends TracedWorkerHost implements OnApplic
     );
   }
 
-  protected async handle() {
+  protected async handle(job: Job) {
+    switch (job.name) {
+      case AttachmentJob.CleanupUploads:
+        return this.cleanupUploads();
+      case AttachmentJob.PurgeWorkspace:
+        return this.purgeWorkspace(job.data as PurgeWorkspaceJob);
+      default:
+        throw new Error(`Unknown attachments job ${job.name}`);
+    }
+  }
+
+  private async purgeWorkspace({ workspaceId }: PurgeWorkspaceJob) {
+    const removed = await this.storage.deletePrefix(objectKey(workspaceId, ''));
+    this.logger.log({ workspaceId, removed }, 'Objects of a deleted workspace removed');
+  }
+
+  private async cleanupUploads() {
     const abandoned = await this.attachments.findAbandoned(
       new Date(Date.now() - this.uploadWindowMs),
       BATCH,

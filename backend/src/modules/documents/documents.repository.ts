@@ -87,6 +87,34 @@ export class DocumentsRepository extends PrismaRepository {
     return rows[0]?.found ?? false;
   }
 
+  async subtreeIds(rootId: string) {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE subtree AS (
+        SELECT id, 0 AS depth FROM documents WHERE id = ${rootId}::uuid
+        UNION ALL
+        SELECT d.id, subtree.depth + 1
+        FROM documents d JOIN subtree ON d.parent_id = subtree.id
+        WHERE d.deleted_at IS NULL AND subtree.depth < ${MAX_TREE_DEPTH}
+      )
+      SELECT id FROM subtree`;
+    return rows.map((row) => row.id);
+  }
+
+  async hasReadOnlyDescendant(rootId: string, userId: string, tx: Transaction) {
+    const rows = await tx.$queryRaw<{ found: boolean }[]>`
+      WITH RECURSIVE subtree AS (
+        SELECT id, 'EDIT'::text AS level, 0 AS depth FROM documents WHERE id = ${rootId}::uuid
+        UNION ALL
+        SELECT d.id, COALESCE(p.access_level::text, subtree.level), subtree.depth + 1
+        FROM documents d
+        JOIN subtree ON d.parent_id = subtree.id
+        LEFT JOIN document_permissions p ON p.document_id = d.id AND p.user_id = ${userId}::uuid
+        WHERE d.deleted_at IS NULL AND subtree.depth < ${MAX_TREE_DEPTH}
+      )
+      SELECT EXISTS (SELECT 1 FROM subtree WHERE level = 'VIEW') AS found`;
+    return rows[0]?.found ?? false;
+  }
+
   async softDeleteSubtree(rootId: string, at: Date, tx: Transaction): Promise<string[]> {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       WITH RECURSIVE subtree AS (
@@ -100,6 +128,27 @@ export class DocumentsRepository extends PrismaRepository {
       WHERE id IN (SELECT id FROM subtree) AND deleted_at IS NULL
       RETURNING id`;
     return rows.map((row) => row.id);
+  }
+
+  listSharedWith(userId: string) {
+    return this.prisma.documentPermission.findMany({
+      where: {
+        userId,
+        document: { deletedAt: null, workspace: { members: { none: { userId } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        accessLevel: true,
+        document: {
+          select: {
+            id: true,
+            workspaceId: true,
+            title: true,
+            workspace: { select: { name: true } },
+          },
+        },
+      },
+    });
   }
 
   listPermissions(documentId: string) {

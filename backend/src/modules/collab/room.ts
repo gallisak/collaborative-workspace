@@ -10,8 +10,10 @@ export interface CollabClient {
   socket: WebSocket;
   user: PresenceUser;
   canWrite: boolean;
+  accessToken: string;
   shareToken: string | null;
   clientIds: Set<number>;
+  expiry?: NodeJS.Timeout;
 }
 
 export class Room {
@@ -84,6 +86,7 @@ export class Room {
 
   destroy() {
     this.closed = true;
+    this.persistence.dispose();
     this.awareness.destroy();
     this.doc.destroy();
   }

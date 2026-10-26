@@ -36,7 +36,15 @@ export class PageRevalidationService {
         distinct: ['documentId'],
         select: { documentId: true },
       });
-      await Promise.all(published.map(({ documentId }) => this.schedule(documentId)));
+      await this.scheduleAll(published.map(({ documentId }) => documentId));
+    } catch (error) {
+      this.logger.warn({ err: error, documentIds }, 'Scheduling page revalidation failed');
+    }
+  }
+
+  async scheduleAll(documentIds: readonly string[]) {
+    try {
+      await Promise.all(documentIds.map((documentId) => this.schedule(documentId)));
     } catch (error) {
       this.logger.warn({ err: error, documentIds }, 'Scheduling page revalidation failed');
     }

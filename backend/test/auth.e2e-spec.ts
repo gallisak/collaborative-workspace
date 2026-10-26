@@ -132,6 +132,19 @@ describe('Auth (e2e)', () => {
       await attempt().expect(429);
       await post('/api/auth/login').send({ email, password: PASSWORD }).expect(429);
     });
+
+    it('keeps the per email limit when attempts come from different addresses', async () => {
+      const { email } = await registerUser(app);
+      const attempt = (i: number) =>
+        post('/api/auth/login')
+          .set('X-Forwarded-For', `203.0.113.${i}`)
+          .send({ email, password: 'WrongPassword1' });
+
+      for (let i = 0; i < 5; i++) {
+        await attempt(i).expect(401);
+      }
+      await attempt(99).expect(429);
+    });
   });
 
   describe('refresh token rotation', () => {

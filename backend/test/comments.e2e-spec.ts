@@ -1,7 +1,12 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import type { INestApplication } from '@nestjs/common';
-import type { Job } from 'bullmq';
+import type { Job, Queue } from 'bullmq';
 import { MailService } from '../src/infra/mail/mail.service.js';
-import type { NotifyMentionsJob } from '../src/infra/queue/notification-jobs.js';
+import {
+  NOTIFICATIONS_QUEUE,
+  NotificationJob,
+  type NotifyMentionsJob,
+} from '../src/infra/queue/notification-jobs.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
 import { MentionsProcessor } from '../src/modules/notifications/mentions.processor.js';
 import { eventually } from './collab-harness.js';
@@ -120,11 +125,34 @@ describe('Comments and notifications (e2e)', () => {
     await eventually(async () => (await unread(viewer)) === 1);
 
     const processor = worker.get(MentionsProcessor);
-    const job = { data: { commentId } } as Job<NotifyMentionsJob>;
+    const job = {
+      name: NotificationJob.NotifyMentions,
+      data: { commentId },
+    } as Job<NotifyMentionsJob>;
     await processor.process(job);
     await processor.process(job);
 
     expect(await prisma.notification.count({ where: { commentId } })).toBe(1);
+  });
+
+  it('delivers mentions whose job was lost through the reconciliation', async () => {
+    const { editor, viewer, documentId } = await setup();
+    const res = await editor
+      .post(`/api/documents/${documentId}/threads`)
+      .send({ blockId: 'b', body: 'lost', mentionedUserIds: [viewer.id] })
+      .expect(201);
+    const commentId = res.body.comments[0].id as string;
+    await eventually(async () => (await unread(viewer)) === 1);
+    await prisma.notification.deleteMany({ where: { commentId } });
+    await prisma.comment.update({
+      where: { id: commentId },
+      data: { createdAt: new Date(Date.now() - 5 * 60_000) },
+    });
+    await worker.get<Queue>(getQueueToken(NOTIFICATIONS_QUEUE)).remove(commentId);
+
+    await worker.get(MentionsProcessor).process({ name: NotificationJob.ReconcileMentions } as Job);
+
+    await eventually(async () => (await prisma.notification.count({ where: { commentId } })) === 1);
   });
 
   it('lets viewers read threads but not comment, and hides threads from strangers', async () => {

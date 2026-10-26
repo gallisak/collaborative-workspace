@@ -173,6 +173,23 @@ describe('Documents (e2e)', () => {
       const stored = await prisma.document.findUniqueOrThrow({ where: { id: child } });
       expect(stored.deletedAt).not.toBeNull();
     });
+
+    it('keeps a subtree with view-only subpages from an editor, but not from an admin', async () => {
+      const { owner, workspaceId } = await setup();
+      const editor = await join(owner, workspaceId, 'EDITOR');
+      const root = await create(owner, workspaceId, { title: 'Root' });
+      const locked = await create(owner, workspaceId, { title: 'Locked', parentId: root });
+      await owner
+        .put(`/api/documents/${locked}/permissions`)
+        .send({ email: editor.email, accessLevel: 'VIEW' })
+        .expect(204);
+
+      await editor.delete(`/api/documents/${root}`).expect(403);
+      await editor.get(`/api/documents/${locked}`).expect(200);
+
+      await owner.delete(`/api/documents/${root}`).expect(204);
+      await owner.get(`/api/documents/${locked}`).expect(404);
+    });
   });
 
   describe('access', () => {
@@ -225,8 +242,31 @@ describe('Documents (e2e)', () => {
       await guest.get(`/api/documents/${secret}`).expect(404);
       await guest.patch(`/api/documents/${sub}`).send({ title: 'No' }).expect(403);
 
+      const list = await guest.get('/api/shared-documents').expect(200);
+      expect(list.body).toEqual([
+        expect.objectContaining({ id: shared, workspaceId, title: 'Shared', accessLevel: 'VIEW' }),
+      ]);
+      const memberList = await owner.get('/api/shared-documents').expect(200);
+      expect(memberList.body).toEqual([]);
+
       await owner.delete(`/api/documents/${shared}/permissions/${guest.id}`).expect(204);
       await guest.get(`/api/documents/${shared}`).expect(404);
+      expect((await guest.get('/api/shared-documents').expect(200)).body).toEqual([]);
+    });
+
+    it('drops the document grants of a removed member', async () => {
+      const { owner, workspaceId } = await setup();
+      const member = await join(owner, workspaceId, 'VIEWER');
+      const doc = await create(owner, workspaceId, { title: 'Doc' });
+      await owner
+        .put(`/api/documents/${doc}/permissions`)
+        .send({ email: member.email, accessLevel: 'EDIT' })
+        .expect(204);
+
+      await owner.delete(`/api/workspaces/${workspaceId}/members/${member.id}`).expect(204);
+
+      await member.get(`/api/documents/${doc}`).expect(404);
+      expect(await prisma.documentPermission.count({ where: { userId: member.id } })).toBe(0);
     });
 
     it('lets a document grant override the workspace role in both directions', async () => {

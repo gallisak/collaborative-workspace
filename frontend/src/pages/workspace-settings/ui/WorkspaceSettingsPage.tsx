@@ -1,7 +1,15 @@
 import { Suspense } from 'react';
-import { assignableRoles, canManageMembers, ROLE_LABELS } from '@/entities/workspace';
+import {
+  assignableRoles,
+  canChangeRole,
+  canManageMembers,
+  canRemoveMember,
+  ROLE_LABELS,
+} from '@/entities/workspace';
+import { DeleteWorkspaceButton } from '@/features/delete-workspace';
 import { RenameWorkspaceForm } from '@/features/edit-workspace';
 import { InviteMemberForm, RevokeInvitationButton } from '@/features/invite-member';
+import { MemberRoleSelect, RemoveMemberButton } from '@/features/manage-members';
 import { getSessionUser, load } from '@/shared/dal';
 import { Badge } from '@/shared/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
@@ -58,6 +66,9 @@ async function Settings({ params }: WorkspaceSettingsPageProps) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -73,7 +84,29 @@ async function Settings({ params }: WorkspaceSettingsPageProps) {
                     <div className="text-muted-foreground text-xs">{member.email}</div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{ROLE_LABELS[member.role]}</Badge>
+                    {member.userId !== user.id && canChangeRole(workspace.role, member.role) ? (
+                      <MemberRoleSelect
+                        workspaceId={workspaceId}
+                        userId={member.userId}
+                        name={member.name}
+                        role={member.role}
+                        roles={roles}
+                      />
+                    ) : (
+                      <Badge variant="secondary">{ROLE_LABELS[member.role]}</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {(member.userId === user.id
+                      ? member.role !== 'OWNER'
+                      : canRemoveMember(workspace.role, member.role)) && (
+                      <RemoveMemberButton
+                        workspaceId={workspaceId}
+                        userId={member.userId}
+                        name={member.name}
+                        self={member.userId === user.id}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -115,6 +148,20 @@ async function Settings({ params }: WorkspaceSettingsPageProps) {
                 </TableBody>
               </Table>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {workspace.role === 'OWNER' && (
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle>Delete workspace</CardTitle>
+            <CardDescription>
+              Removes the workspace with all its pages for every member.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeleteWorkspaceButton workspaceId={workspaceId} name={workspace.name} />
           </CardContent>
         </Card>
       )}

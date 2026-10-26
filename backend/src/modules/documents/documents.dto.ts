@@ -136,3 +136,20 @@ export class DocumentPermissionDto {
   @ApiProperty({ enum: AccessLevel, enumName: 'AccessLevel' })
   accessLevel: AccessLevel;
 }
+
+export class SharedDocumentDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty({ format: 'uuid' })
+  workspaceId: string;
+
+  @ApiProperty()
+  workspaceName: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiProperty({ enum: AccessLevel, enumName: 'AccessLevel' })
+  accessLevel: AccessLevel;
+}

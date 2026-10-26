@@ -39,6 +39,10 @@ export function contentExtensions() {
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Image.configure({ inline: false, allowBase64: false }),
+    Image.configure({
+      inline: false,
+      allowBase64: false,
+      HTMLAttributes: { referrerpolicy: 'no-referrer', loading: 'lazy' },
+    }),
   ];
 }

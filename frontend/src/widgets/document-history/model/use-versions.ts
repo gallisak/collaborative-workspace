@@ -32,15 +32,17 @@ export function useVersions(documentId: string) {
   }, [fetchVersions]);
 
   const waitForNew = useCallback(
-    async (known: number) => {
+    async (known: readonly Version[] | null) => {
+      const knownIds = new Set(known?.map((version) => version.id));
       for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
         const fresh = await fetchVersions();
-        if (fresh.length > known) {
+        if (fresh.some((version) => version.kind === 'MANUAL' && !knownIds.has(version.id))) {
           setVersions(fresh);
-          return;
+          return true;
         }
       }
+      return false;
     },
     [fetchVersions],
   );

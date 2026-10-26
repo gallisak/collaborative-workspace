@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(serverEnv.FRONTEND_URL),
   title: { default: 'Collab Docs', template: '%s · Collab Docs' },
   description: 'Collaborative documents with real-time editing',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

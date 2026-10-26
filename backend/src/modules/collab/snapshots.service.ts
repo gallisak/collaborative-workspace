@@ -45,14 +45,20 @@ export class SnapshotsService {
   }
 
   async take(room: Room, kind: VersionKind, name: string | null, userId: string | null) {
+    const changed = room.changedSinceVersion;
     room.changedSinceVersion = false;
-    const version = await this.versions.create({
-      documentId: room.documentId,
-      kind,
-      name,
-      state: Y.encodeStateAsUpdate(room.doc),
-      createdById: userId,
-    });
+    const version = await this.versions
+      .create({
+        documentId: room.documentId,
+        kind,
+        name,
+        state: Y.encodeStateAsUpdate(room.doc),
+        createdById: userId,
+      })
+      .catch((error: unknown) => {
+        room.changedSinceVersion ||= changed;
+        throw error;
+      });
     room.lastVersionAt = version.createdAt;
     if (kind === 'AUTO') {
       await this.versions.pruneAuto(room.documentId, this.keepAuto);

@@ -24,3 +24,9 @@ export const canAssignRole = (actor: WorkspaceRole, target: WorkspaceRole) =>
 
 export const assignableRoles = (actor: WorkspaceRole) =>
   ASSIGNABLE_ROLES.filter((role) => canAssignRole(actor, role));
+
+export const canChangeRole = (actor: WorkspaceRole, current: WorkspaceRole) =>
+  canManageMembers(actor) && RANK[actor] > RANK[current];
+
+export const canRemoveMember = (actor: WorkspaceRole, member: WorkspaceRole) =>
+  canManageMembers(actor) && RANK[actor] > RANK[member];

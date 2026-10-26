@@ -64,6 +64,47 @@ export class NotificationsRepository extends PrismaRepository {
     });
   }
 
+  async documentIdsInWorkspace(userId: string, workspaceId: string) {
+    const rows = await this.prisma.notification.findMany({
+      where: { userId, document: { is: { workspaceId } } },
+      distinct: ['documentId'],
+      select: { documentId: true },
+    });
+    return rows.flatMap((row) => (row.documentId ? [row.documentId] : []));
+  }
+
+  async recipientsOf(documentIds: string[]) {
+    const rows = await this.prisma.notification.findMany({
+      where: { documentId: { in: documentIds } },
+      distinct: ['userId'],
+      select: { userId: true },
+    });
+    return rows.map((row) => row.userId);
+  }
+
+  deleteForDocuments(userId: string, documentIds: string[]) {
+    return this.prisma.notification.deleteMany({
+      where: { userId, documentId: { in: documentIds } },
+    });
+  }
+
+  async undeliveredMentionComments(createdAfter: Date, createdBefore: Date, limit: number) {
+    const rows = await this.prisma.$queryRaw<{ comment_id: string }[]>`
+      SELECT DISTINCT m.comment_id
+      FROM comment_mentions m
+      JOIN comments c ON c.id = m.comment_id
+      WHERE c.deleted_at IS NULL
+        AND c.created_at > ${createdAfter}
+        AND c.created_at < ${createdBefore}
+        AND m.user_id IS DISTINCT FROM c.author_id
+        AND NOT EXISTS (
+          SELECT 1 FROM notifications n
+          WHERE n.dedupe_key = 'mention:' || m.comment_id || ':' || m.user_id
+        )
+      LIMIT ${limit}`;
+    return rows.map((row) => row.comment_id);
+  }
+
   createMany(data: Prisma.NotificationCreateManyInput[]) {
     return this.prisma.notification.createMany({ data, skipDuplicates: true });
   }

@@ -47,8 +47,11 @@ export function HistoryPanel({ documentId, canEdit, onClose }: HistoryPanelProps
         }),
       );
       setName('');
-      await waitForNew(versions?.length ?? 0);
-      toast.success('Version saved');
+      if (await waitForNew(versions)) {
+        toast.success('Version saved');
+      } else {
+        toast.info('The version is being saved and will appear in a moment');
+      }
     } catch (error) {
       notifyError(error);
     } finally {
@@ -78,8 +81,11 @@ export function HistoryPanel({ documentId, canEdit, onClose }: HistoryPanelProps
         }),
       );
       setSelected(null);
-      await waitForNew(versions?.length ?? 0);
-      toast.success('Version restored for everyone');
+      if (await waitForNew(versions)) {
+        toast.success('Version restored for everyone');
+      } else {
+        toast.info('The version is being restored, the page updates in a moment');
+      }
     } catch (error) {
       notifyError(error);
     } finally {

@@ -6,7 +6,8 @@ import { durationToSeconds } from '../../common/duration.js';
 import type { Env } from '../../infra/config/env.schema.js';
 import { REDIS } from '../../infra/redis/redis.module.js';
 
-const key = (userId: string) => `auth:revoked-before:${userId}`;
+const userKey = (userId: string) => `auth:revoked-before:${userId}`;
+const familyKey = (familyId: string) => `auth:revoked-family:${familyId}`;
 
 export function issuedAtMs(payload: AccessTokenPayload): number | undefined {
   return payload.iatMs ?? (payload.iat === undefined ? undefined : payload.iat * 1000);
@@ -30,16 +31,32 @@ export class AccessTokenRevocationService {
 
   async revokeIssuedBeforeNow(userId: string) {
     try {
-      await this.redis.set(key(userId), Date.now(), 'EX', this.ttlSeconds);
+      await this.redis.set(userKey(userId), Date.now(), 'EX', this.ttlSeconds);
     } catch (error) {
       this.logger.warn({ err: error, userId }, 'Could not revoke access tokens');
+    }
+  }
+
+  async revokeFamily(familyId: string) {
+    try {
+      await this.redis.set(familyKey(familyId), Date.now(), 'EX', this.ttlSeconds);
+    } catch (error) {
+      this.logger.warn({ err: error, familyId }, 'Could not revoke access tokens of a session');
     }
   }
 
   async isRevoked(payload: AccessTokenPayload): Promise<boolean> {
     const userId = payload.sub;
     try {
-      return issuedBeforeRevocation(issuedAtMs(payload), await this.redis.get(key(userId)));
+      const [userRevokedBefore, familyRevokedBefore] = await this.redis.mget(
+        userKey(userId),
+        familyKey(payload.fid ?? ''),
+      );
+      const issuedAt = issuedAtMs(payload);
+      return (
+        issuedBeforeRevocation(issuedAt, userRevokedBefore) ||
+        (payload.fid !== undefined && issuedBeforeRevocation(issuedAt, familyRevokedBefore))
+      );
     } catch (error) {
       this.logger.warn({ err: error, userId }, 'Revocation check unavailable, allowing token');
       return false;

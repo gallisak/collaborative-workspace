@@ -75,7 +75,14 @@ function CollaborativeEditor({
     [session],
   );
   const blocked = snapshot.state === 'lost-access' || snapshot.state === 'unauthorized';
-  const writable = editable && snapshot.synced && !blocked;
+  const reloading = snapshot.state === 'access-changed';
+  const writable = editable && snapshot.synced && !blocked && !reloading;
+
+  useEffect(() => {
+    if (reloading) {
+      window.location.reload();
+    }
+  }, [reloading]);
 
   useEffect(() => {
     editor?.setEditable(writable);

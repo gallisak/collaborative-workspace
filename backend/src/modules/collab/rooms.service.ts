@@ -10,12 +10,22 @@ import { type CollabClient, LOAD_ORIGIN, Room } from './room.js';
 import { type PersistenceOptions, RoomPersistence } from './room-persistence.js';
 import { SnapshotsService } from './snapshots.service.js';
 
+const RELEASE_RETRY_MS = 5000;
+
+export class RoomsClosedError extends Error {
+  constructor() {
+    super('Collaboration server is shutting down');
+  }
+}
+
 @Injectable()
 export class RoomsService {
   private readonly logger = new Logger(RoomsService.name);
   private readonly loading = new Map<string, Promise<Room>>();
   private readonly loaded = new Map<string, Room>();
+  private readonly retrying = new WeakSet<Room>();
   private readonly options: PersistenceOptions;
+  private closing = false;
 
   constructor(
     private readonly store: DocumentStore,
@@ -51,12 +61,16 @@ export class RoomsService {
     if (!this.isIdle(room)) {
       return;
     }
-    await room.persistence.flushAndCompact();
-    await this.snapshots.takeIfChanged(room);
-    if (this.isIdle(room) && this.loaded.get(room.documentId) === room) {
-      this.forget(room);
-      this.logger.debug({ documentId: room.documentId }, 'Room closed');
+    await this.persist(room);
+    if (!this.isIdle(room) || this.loaded.get(room.documentId) !== room) {
+      return;
     }
+    if (room.persistence.dirty) {
+      this.retryRelease(room);
+      return;
+    }
+    this.forget(room);
+    this.logger.debug({ documentId: room.documentId }, 'Room closed');
   }
 
   stats() {
@@ -67,22 +81,52 @@ export class RoomsService {
     };
   }
 
+  all(): Room[] {
+    return [...this.loaded.values()];
+  }
+
   inWorkspace(workspaceId: string): Room[] {
     return [...this.loaded.values()].filter((room) => room.workspaceId === workspaceId);
   }
 
   async closeAll() {
+    this.closing = true;
     await Promise.allSettled(this.loading.values());
     await Promise.all(
       [...this.loaded.values()].map(async (room) => {
         for (const client of room.clients.values()) {
           client.socket.close(CloseCode.ServerRestart, 'Server restarting');
         }
-        await room.persistence.flushAndCompact();
-        await this.snapshots.takeIfChanged(room);
+        await this.persist(room);
+        if (room.persistence.dirty) {
+          this.logger.error(
+            { documentId: room.documentId },
+            'Unsaved changes are lost on shutdown, clients resend them on reconnect',
+          );
+        }
         this.forget(room);
       }),
     );
+  }
+
+  private async persist(room: Room) {
+    await room.persistence.flushAndCompact();
+    try {
+      await this.snapshots.takeIfChanged(room);
+    } catch (error) {
+      this.logger.error({ err: error, documentId: room.documentId }, 'Saving a version failed');
+    }
+  }
+
+  private retryRelease(room: Room) {
+    if (this.retrying.has(room)) {
+      return;
+    }
+    this.retrying.add(room);
+    setTimeout(() => {
+      this.retrying.delete(room);
+      void this.release(room);
+    }, RELEASE_RETRY_MS);
   }
 
   private isIdle(room: Room) {
@@ -91,6 +135,9 @@ export class RoomsService {
 
   private async acquireOpen(documentId: string, workspaceId: string): Promise<Room> {
     for (;;) {
+      if (this.closing) {
+        throw new RoomsClosedError();
+      }
       const room = await this.acquire(documentId, workspaceId);
       if (!room.closed) {
         return room;

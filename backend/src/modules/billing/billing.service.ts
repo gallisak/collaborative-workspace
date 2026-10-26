@@ -18,6 +18,7 @@ import type {
   WorkspaceBillingDto,
 } from './billing.dto.js';
 import { BillingRepository } from './billing.repository.js';
+import { planMisfit } from './plan-fit.js';
 
 export const toPlanDto = (plan: Plan): PlanDto => ({
   id: plan.id,
@@ -80,12 +81,13 @@ export class BillingService {
     if (workspace.planId === dto.planId) {
       throw new BadRequestException(`The workspace is already on the ${workspace.plan.name} plan`);
     }
-    const plan = await this.billing.findPlan(dto.planId);
-    const members = workspace._count.members;
-    if (plan.maxMembers !== null && members > plan.maxMembers) {
-      throw new ConflictException(
-        `The ${plan.name} plan allows up to ${plan.maxMembers} members, the workspace has ${members}. Remove members first.`,
-      );
+    const [plan, usage] = await Promise.all([
+      this.billing.findPlan(dto.planId),
+      this.billing.usage(workspaceId),
+    ]);
+    const misfit = planMisfit(plan, usage);
+    if (misfit) {
+      throw new ConflictException(misfit);
     }
     const session = await this.billing.createCheckout({
       workspaceId,
@@ -123,6 +125,7 @@ export class BillingService {
       workspaceId: session.workspaceId,
       plan: toPlanDto(session.plan),
       status: expired ? 'EXPIRED' : session.status,
+      failureReason: session.failureReason,
       expiresAt: session.expiresAt,
       url: new URL(`/billing/checkout/${session.id}`, this.frontendUrl).toString(),
     };

@@ -98,6 +98,28 @@ describe('RoomPersistence', () => {
     expect(restore(store.appended)).toBe('kept');
   });
 
+  it('retries a failed write on its own without new edits', async () => {
+    const { doc, store, persistence } = setup();
+    store.failNextAppend = true;
+    doc.getText('body').insert(0, 'retried');
+
+    await vi.advanceTimersByTimeAsync(20);
+    expect(persistence.dirty).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(40);
+    expect(restore(store.appended)).toBe('retried');
+    expect(persistence.dirty).toBe(false);
+  });
+
+  it('stops writing after it is disposed', async () => {
+    const { doc, store, persistence } = setup();
+    doc.getText('body').insert(0, 'late');
+    persistence.dispose();
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(store.appended).toHaveLength(0);
+  });
+
   it('skips the snapshot when nothing changed since the last one', async () => {
     const { store, persistence } = setup();
 

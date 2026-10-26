@@ -114,7 +114,7 @@ describe('Versions (e2e)', () => {
     await eventually(() => read(client.doc) === paragraph('v1'));
     await eventually(async () => (await storedContent(documentId)) === paragraph('v1'));
     const backup = (await versions(owner, documentId)).find((v) => v.name === 'Before restore')!;
-    expect(backup.kind).toBe('AUTO');
+    expect(backup).toMatchObject({ kind: 'MANUAL', createdBy: { id: owner.id } });
     expect(await versionContent(owner, documentId, backup.id)).toBe(paragraph('v2'));
   });
 

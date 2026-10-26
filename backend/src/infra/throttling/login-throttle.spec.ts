@@ -12,12 +12,15 @@ const httpContext = (method: string, path: string) =>
   }) as unknown as ExecutionContext;
 
 describe('login throttling', () => {
-  it('tracks login attempts per ip and normalized email', () => {
-    expect(loginEmailTracker(req({ email: ' User@Mail.com ' }))).toBe('10.0.0.1:user@mail.com');
+  it('tracks login attempts per normalized email from any ip', () => {
+    expect(loginEmailTracker(req({ email: ' User@Mail.com ' }))).toBe('email:user@mail.com');
+    expect(loginEmailTracker(req({ email: 'user@mail.com' }, '10.0.0.2'))).toBe(
+      'email:user@mail.com',
+    );
   });
 
-  it('still tracks per ip when the email is missing', () => {
-    expect(loginEmailTracker(req({}))).toBe('10.0.0.1:');
+  it('falls back to the ip when the email is missing', () => {
+    expect(loginEmailTracker(req({}))).toBe('ip:10.0.0.1');
   });
 
   it('prefers the client ip from a trusted proxy chain', () => {

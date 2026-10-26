@@ -2,6 +2,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NotFound,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -97,6 +98,21 @@ export class StorageService implements OnModuleDestroy {
         Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
       }),
     );
+  }
+
+  async deletePrefix(prefix: string): Promise<number> {
+    let removed = 0;
+    let token: string | undefined;
+    do {
+      const page = await this.internal.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      const keys = (page.Contents ?? []).flatMap((object) => (object.Key ? [object.Key] : []));
+      await this.delete(keys);
+      removed += keys.length;
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return removed;
   }
 
   onModuleDestroy() {

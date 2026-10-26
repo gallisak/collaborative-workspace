@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { RegisterForm } from '@/features/auth';
+import { AUTH_SWITCH_LINK_CLASS, AuthSwitchLink, RegisterForm } from '@/features/auth';
 import { routes } from '@/shared/config';
 import { AuthCard } from '@/shared/ui/auth-card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -13,9 +13,15 @@ export function RegisterPage() {
       footer={
         <>
           Already have an account?&nbsp;
-          <Link href={routes.login} className="text-foreground underline underline-offset-4">
-            Sign in
-          </Link>
+          <Suspense
+            fallback={
+              <Link href={routes.login} className={AUTH_SWITCH_LINK_CLASS}>
+                Sign in
+              </Link>
+            }
+          >
+            <AuthSwitchLink to={routes.login}>Sign in</AuthSwitchLink>
+          </Suspense>
         </>
       }
     >

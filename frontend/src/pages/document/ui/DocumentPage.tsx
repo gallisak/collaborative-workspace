@@ -1,4 +1,6 @@
+import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
+import { routes } from '@/shared/config';
 import { getSessionUser, load, loadOptional } from '@/shared/dal';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { DocumentWorkspace } from './DocumentWorkspace';
@@ -17,6 +19,9 @@ async function DocumentView({ params }: DocumentPageProps) {
       api.GET('/api/workspaces/{workspaceId}/members', { params: { path: { workspaceId } } }),
     ),
   ]);
+  if (document.workspaceId !== workspaceId) {
+    redirect(routes.document(document.workspaceId, document.id));
+  }
   const canModerate = document.access === 'MANAGE';
   const [grants, shareLinks] = canModerate
     ? await Promise.all([

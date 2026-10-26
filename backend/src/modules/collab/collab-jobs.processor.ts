@@ -56,7 +56,7 @@ export class CollabJobsProcessor extends TracedWorkerHost {
       return;
     }
     await this.rooms.use(documentId, workspaceId, async (room) => {
-      await this.snapshots.take(room, 'AUTO', 'Before restore', userId);
+      await this.snapshots.take(room, 'MANUAL', 'Before restore', userId);
       restoreContent(room.doc, version.state, RESTORE_ORIGIN);
       room.changedSinceVersion = false;
     });

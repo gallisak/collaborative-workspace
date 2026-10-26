@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { ClsModule, ClsServiceManager } from 'nestjs-cls';
 import { LoggerModule } from 'nestjs-pino';
 import { resolveCorrelationId } from '../../common/correlation.js';
+import { redactUrl } from '../../common/redact-url.js';
 import type { Env } from '../config/env.schema.js';
 
 @Module({
@@ -32,8 +33,9 @@ import type { Env } from '../config/env.schema.js';
               const userId = cls.get<string | undefined>('userId');
               return { correlationId: cls.getId(), ...(userId && { userId }) };
             },
-            redact: ['req.headers.authorization', 'req.headers.cookie'],
+            redact: ['req.headers.authorization', 'req.headers.cookie', 'req.params.token'],
             serializers: {
+              req: (req: { url: string }) => ({ ...req, url: redactUrl(req.url) }),
               res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
             },
             autoLogging: {

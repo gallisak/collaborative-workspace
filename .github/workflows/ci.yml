@@ -125,7 +125,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Start the stack
         working-directory: .
-        run: docker compose up -d --build --wait web worker
+        run: docker compose up -d --build --wait ingress worker
       - name: E2E tests
         run: npx playwright test
       - name: Service logs

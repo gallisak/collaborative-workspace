@@ -1,7 +1,9 @@
 import {
+  type BeforeApplicationShutdown,
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
@@ -22,6 +24,7 @@ import { TokenService } from '../auth/token.service.js';
 import { canEdit } from '../permissions/document-access.js';
 import { DocumentAccessService } from '../permissions/document-access.service.js';
 import { UsersService } from '../users/users.service.js';
+import { CollabJobsProcessor } from './collab-jobs.processor.js';
 import { documentIdFromUrl, isAllowedOrigin, shareTokenFromUrl } from './connection-request.js';
 import {
   CloseCode,
@@ -34,7 +37,7 @@ import {
   sanitizeAwarenessUpdate,
 } from './protocol.js';
 import { type CollabClient, type Room, send } from './room.js';
-import { RoomsService } from './rooms.service.js';
+import { RoomsClosedError, RoomsService } from './rooms.service.js';
 
 class ConnectionRejected extends Error {
   constructor(
@@ -55,7 +58,9 @@ const toBytes = (data: RawData): Uint8Array =>
       : new Uint8Array(data);
 
 @Injectable()
-export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutdown {
+export class CollabGateway
+  implements OnApplicationBootstrap, BeforeApplicationShutdown, OnApplicationShutdown
+{
   private readonly logger = new Logger(CollabGateway.name);
   private readonly allowedOrigins: string[];
   private readonly heartbeatMs: number;
@@ -64,6 +69,7 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
   private readonly subscriber: Redis;
   private heartbeat: NodeJS.Timeout | undefined;
   private server: Server | undefined;
+  private rechecking = false;
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -71,6 +77,7 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
     private readonly tokens: TokenService,
     private readonly users: UsersService,
     private readonly documentAccess: DocumentAccessService,
+    private readonly jobs: CollabJobsProcessor,
     @Inject(REDIS) redis: Redis,
     config: ConfigService<Env, true>,
   ) {
@@ -86,18 +93,29 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
   async onApplicationBootstrap() {
     this.server = this.adapterHost.httpAdapter.getHttpServer() as Server;
     this.server.on('upgrade', this.onUpgrade);
-    this.heartbeat = setInterval(() => this.checkHeartbeats(), this.heartbeatMs);
+    this.heartbeat = setInterval(() => {
+      this.checkHeartbeats();
+      void this.recheckAll();
+    }, this.heartbeatMs);
     this.subscriber.on('message', (_channel: string, workspaceId: string) => {
-      void this.recheckWorkspace(workspaceId);
+      void this.recheckClients(this.clientsOf(this.rooms.inWorkspace(workspaceId)));
     });
+    this.subscriber.on('ready', () => void this.recheckAll());
     await this.subscriber.subscribe(ACCESS_CHANGED_CHANNEL);
   }
 
-  async onApplicationShutdown() {
+  async beforeApplicationShutdown() {
     clearInterval(this.heartbeat);
     this.server?.off('upgrade', this.onUpgrade);
+    await this.jobs.worker.close();
     await this.rooms.closeAll();
+    for (const socket of this.wss.clients) {
+      socket.terminate();
+    }
     this.wss.close();
+  }
+
+  onApplicationShutdown() {
     this.subscriber.disconnect();
   }
 
@@ -109,7 +127,6 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
     const buffered: Uint8Array[] = [];
     let client: CollabClient | undefined;
     let room: Room | undefined;
-    let expiry: NodeJS.Timeout | undefined;
 
     this.alive.add(socket);
     socket.on('pong', () => this.alive.add(socket));
@@ -122,7 +139,7 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
       }
     });
     socket.on('close', () => {
-      clearTimeout(expiry);
+      clearTimeout(client?.expiry);
       if (client && room) {
         room.leave(client);
         void this.rooms.release(room);
@@ -130,18 +147,16 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
     });
 
     try {
-      const { documentId, workspaceId, user, canWrite, shareToken, linkExpiresAt } =
+      const { documentId, workspaceId, user, canWrite, accessToken, shareToken, linkExpiresAt } =
         await this.authenticate(req);
-      client = { socket, user, canWrite, shareToken, clientIds: new Set() };
+      client = { socket, user, canWrite, accessToken, shareToken, clientIds: new Set() };
       room = await this.rooms.join(documentId, workspaceId, client);
       if (socket.readyState !== socket.OPEN) {
         room.leave(client);
         void this.rooms.release(room);
         return;
       }
-      if (linkExpiresAt) {
-        expiry = this.recheckAt(room, client, linkExpiresAt);
-      }
+      this.scheduleExpiry(room, client, linkExpiresAt);
       send(socket, encodeSyncStep1(room.doc));
       const presence = [...room.awareness.getStates().keys()];
       if (presence.length > 0) {
@@ -156,6 +171,8 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
       room = undefined;
       if (error instanceof ConnectionRejected) {
         socket.close(error.code, error.message);
+      } else if (error instanceof RoomsClosedError) {
+        socket.close(CloseCode.ServerRestart, 'Server restarting');
       } else {
         this.logger.error({ err: error }, 'Collaboration connection failed');
         socket.close(1011, 'Internal error');
@@ -183,14 +200,17 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
       throw new ConnectionRejected(CloseCode.Unauthorized, 'Not authenticated');
     }
     const shareToken = shareTokenFromUrl(req.url);
-    const resolved = await this.access(documentId, user.id, shareToken).catch(() =>
-      Promise.reject(new ConnectionRejected(CloseCode.NotFound, 'Document not found')),
-    );
+    const resolved = await this.access(documentId, user.id, shareToken).catch((error: unknown) => {
+      throw error instanceof NotFoundException
+        ? new ConnectionRejected(CloseCode.NotFound, 'Document not found')
+        : error;
+    });
     return {
       documentId,
       workspaceId: resolved.document.workspaceId,
       user: { id: user.id, name: user.name },
       canWrite: canEdit(resolved.access),
+      accessToken: token,
       shareToken,
       linkExpiresAt: resolved.linkExpiresAt,
     };
@@ -250,25 +270,64 @@ export class CollabGateway implements OnApplicationBootstrap, OnApplicationShutd
     }
   }
 
-  private async recheckWorkspace(workspaceId: string) {
-    for (const room of this.rooms.inWorkspace(workspaceId)) {
-      for (const client of [...room.clients.values()]) {
-        await this.recheck(room, client);
-      }
+  private clientsOf(rooms: Room[]) {
+    return rooms.flatMap((room) => [...room.clients.values()].map((client) => ({ room, client })));
+  }
+
+  private async recheckAll() {
+    if (this.rechecking) {
+      return;
+    }
+    this.rechecking = true;
+    try {
+      await this.recheckClients(this.clientsOf(this.rooms.all()));
+    } finally {
+      this.rechecking = false;
     }
   }
 
-  private recheckAt(room: Room, client: CollabClient, at: Date) {
-    const delay = Math.min(Math.max(0, at.getTime() - Date.now()), MAX_TIMER_MS);
-    return setTimeout(() => void this.recheck(room, client), delay);
+  private async recheckClients(sessions: { room: Room; client: CollabClient }[]) {
+    for (const { room, client } of sessions) {
+      await this.recheck(room, client);
+    }
+  }
+
+  private scheduleExpiry(room: Room, client: CollabClient, at: Date | null) {
+    clearTimeout(client.expiry);
+    client.expiry = undefined;
+    if (at) {
+      const delay = Math.min(Math.max(0, at.getTime() - Date.now()), MAX_TIMER_MS);
+      client.expiry = setTimeout(() => void this.recheck(room, client), delay);
+    }
   }
 
   private async recheck(room: Room, client: CollabClient) {
+    if (client.socket.readyState !== client.socket.OPEN) {
+      return;
+    }
     try {
-      const { access } = await this.access(room.documentId, client.user.id, client.shareToken);
-      client.canWrite = canEdit(access);
-    } catch {
-      client.socket.close(CloseCode.NotFound, 'Access revoked or document deleted');
+      if (await this.tokens.isAccessTokenRevoked(client.accessToken)) {
+        client.socket.close(CloseCode.Unauthorized, 'Session ended');
+        return;
+      }
+      const resolved = await this.access(room.documentId, client.user.id, client.shareToken);
+      const canWrite = canEdit(resolved.access);
+      if (canWrite !== client.canWrite) {
+        client.canWrite = canWrite;
+        client.socket.close(CloseCode.AccessChanged, 'Access level changed');
+        return;
+      }
+      this.scheduleExpiry(room, client, resolved.linkExpiresAt);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        client.canWrite = false;
+        client.socket.close(CloseCode.NotFound, 'Access revoked or document deleted');
+        return;
+      }
+      this.logger.warn(
+        { err: error, documentId: room.documentId, userId: client.user.id },
+        'Access recheck failed',
+      );
     }
   }
 

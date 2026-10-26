@@ -35,8 +35,21 @@ export class WorkspacesRepository extends PrismaRepository {
     return this.prisma.workspace.update({ where: { id: workspaceId }, data: { name } });
   }
 
-  delete(workspaceId: string) {
-    return this.prisma.workspace.delete({ where: { id: workspaceId } });
+  async publishedDocumentIds(workspaceId: string, now: Date, tx: Transaction) {
+    const links = await tx.shareLink.findMany({
+      where: {
+        document: { workspaceId, deletedAt: null },
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      distinct: ['documentId'],
+      select: { documentId: true },
+    });
+    return links.map((link) => link.documentId);
+  }
+
+  delete(workspaceId: string, tx: Transaction) {
+    return tx.workspace.delete({ where: { id: workspaceId } });
   }
 
   countMembers(workspaceId: string, tx: Transaction) {
@@ -74,7 +87,9 @@ export class WorkspacesRepository extends PrismaRepository {
     });
   }
 
-  removeMember(workspaceId: string, userId: string, tx: Transaction) {
-    return tx.workspaceMember.delete({ where: { workspaceId_userId: { workspaceId, userId } } });
+  async removeMember(workspaceId: string, userId: string, tx: Transaction) {
+    await tx.documentPermission.deleteMany({ where: { userId, document: { workspaceId } } });
+    await tx.notification.deleteMany({ where: { userId, document: { is: { workspaceId } } } });
+    await tx.workspaceMember.delete({ where: { workspaceId_userId: { workspaceId, userId } } });
   }
 }

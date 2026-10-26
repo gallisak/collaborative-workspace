@@ -14,6 +14,7 @@ export const CloseCode = {
   Unauthorized: 4401,
   Forbidden: 4403,
   NotFound: 4404,
+  AccessChanged: 4409,
   ServerRestart: 1012,
 } as const;
 

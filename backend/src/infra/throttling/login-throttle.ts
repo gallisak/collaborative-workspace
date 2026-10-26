@@ -18,5 +18,5 @@ export function isLoginRequest(context: ExecutionContext): boolean {
 export function loginEmailTracker(req: TrackedRequest): string {
   const email: unknown = (req.body as { email?: unknown } | undefined)?.email;
   const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
-  return `${clientIp(req)}:${normalized}`;
+  return normalized ? `email:${normalized}` : `ip:${clientIp(req)}`;
 }

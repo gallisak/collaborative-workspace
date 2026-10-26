@@ -8,6 +8,8 @@ export interface PersistenceOptions {
   compactionThreshold: number;
 }
 
+const MAX_RETRY_DELAY_MS = 30_000;
+
 const isMissingDocument = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
 
@@ -16,6 +18,8 @@ export class RoomPersistence {
   private pending: Uint8Array[] = [];
   private timer: NodeJS.Timeout | null = null;
   private queue: Promise<void> = Promise.resolve();
+  private failures = 0;
+  private disposed = false;
   private lastUpdateId: bigint;
   private snapshotUpdateId: bigint;
   private updatesSinceSnapshot: number;
@@ -34,12 +38,13 @@ export class RoomPersistence {
     this.updatesSinceSnapshot = stored.updates.length;
   }
 
+  get dirty() {
+    return this.pending.length > 0;
+  }
+
   record(update: Uint8Array) {
     this.pending.push(update);
-    this.timer ??= setTimeout(() => {
-      this.timer = null;
-      void this.flush();
-    }, this.options.flushIntervalMs);
+    this.schedule(this.options.flushIntervalMs);
   }
 
   flush(): Promise<void> {
@@ -47,25 +52,58 @@ export class RoomPersistence {
   }
 
   flushAndCompact(): Promise<void> {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
+    this.cancelTimer();
     return this.enqueue(async () => {
       await this.writePending();
       await this.compact();
     });
   }
 
+  dispose() {
+    this.disposed = true;
+    this.cancelTimer();
+  }
+
+  private schedule(delayMs: number) {
+    if (this.disposed) {
+      return;
+    }
+    this.timer ??= setTimeout(() => {
+      this.timer = null;
+      void this.flush();
+    }, delayMs);
+  }
+
+  private cancelTimer() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
   private enqueue(work: () => Promise<void>): Promise<void> {
-    this.queue = this.queue.then(work).catch((error: unknown) => {
-      if (isMissingDocument(error)) {
-        this.pending = [];
-        this.onDocumentGone();
-        return;
-      }
-      this.logger.error({ err: error, documentId: this.documentId }, 'Persisting document failed');
-    });
+    this.queue = this.queue.then(work).then(
+      () => {
+        this.failures = 0;
+      },
+      (error: unknown) => {
+        if (isMissingDocument(error)) {
+          this.pending = [];
+          this.onDocumentGone();
+          return;
+        }
+        this.failures++;
+        this.logger.error(
+          { err: error, documentId: this.documentId, pendingUpdates: this.pending.length },
+          'Persisting document failed',
+        );
+        if (this.dirty) {
+          this.schedule(
+            Math.min(this.options.flushIntervalMs * 2 ** this.failures, MAX_RETRY_DELAY_MS),
+          );
+        }
+      },
+    );
     return this.queue;
   }
 

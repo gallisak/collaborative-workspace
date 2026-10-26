@@ -38,6 +38,7 @@ enum CheckoutSessionStatus {
   OPEN
   COMPLETED
   EXPIRED
+  FAILED
 }
 
 enum VersionKind {
@@ -372,14 +373,15 @@ model Subscription {
 }
 
 model CheckoutSession {
-  id          String                @id @default(uuid(7)) @db.Uuid
-  workspaceId String                @map("workspace_id") @db.Uuid
-  planId      PlanTier              @map("plan_id")
-  status      CheckoutSessionStatus @default(OPEN)
-  createdById String?               @map("created_by_id") @db.Uuid
-  expiresAt   DateTime              @map("expires_at") @db.Timestamptz(3)
-  completedAt DateTime?             @map("completed_at") @db.Timestamptz(3)
-  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  id            String                @id @default(uuid(7)) @db.Uuid
+  workspaceId   String                @map("workspace_id") @db.Uuid
+  planId        PlanTier              @map("plan_id")
+  status        CheckoutSessionStatus @default(OPEN)
+  createdById   String?               @map("created_by_id") @db.Uuid
+  expiresAt     DateTime              @map("expires_at") @db.Timestamptz(3)
+  completedAt   DateTime?             @map("completed_at") @db.Timestamptz(3)
+  failureReason String?               @map("failure_reason")
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)

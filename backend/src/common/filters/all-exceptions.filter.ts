@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { ClsServiceManager } from 'nestjs-cls';
 import { Prisma } from '../../generated/prisma/client.js';
+import { redactUrl } from '../redact-url.js';
 
 export interface ErrorBody {
   statusCode: number;
@@ -81,7 +82,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
     };
 
-    this.log(statusCode, exception, { message, path: req.originalUrl, method: req.method });
+    this.log(statusCode, exception, {
+      message,
+      path: redactUrl(req.originalUrl),
+      method: req.method,
+    });
     res.status(statusCode).json(body);
   }
 

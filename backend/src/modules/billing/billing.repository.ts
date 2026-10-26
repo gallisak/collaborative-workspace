@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { PlanTier } from '../../generated/prisma/enums.js';
 import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-work.js';
+import type { WorkspaceUsage } from './plan-fit.js';
 
 export interface NewBillingEvent {
   id: string;
@@ -23,8 +24,21 @@ export class BillingRepository extends PrismaRepository {
     return this.prisma.plan.findMany({ orderBy: { priceMinor: 'asc' } });
   }
 
-  findPlan(planId: PlanTier) {
-    return this.prisma.plan.findUniqueOrThrow({ where: { id: planId } });
+  findPlan(planId: PlanTier, tx?: Transaction) {
+    return this.db(tx).plan.findUniqueOrThrow({ where: { id: planId } });
+  }
+
+  async usage(workspaceId: string, tx?: Transaction): Promise<WorkspaceUsage> {
+    const db = this.db(tx);
+    const [members, documents, storage] = await Promise.all([
+      db.workspaceMember.count({ where: { workspaceId } }),
+      db.document.count({ where: { workspaceId, deletedAt: null } }),
+      db.attachment.aggregate({
+        where: { workspaceId, status: 'UPLOADED' },
+        _sum: { sizeBytes: true },
+      }),
+    ]);
+    return { members, documents, storageBytes: storage._sum.sizeBytes ?? 0n };
   }
 
   findWorkspace(workspaceId: string, now = new Date()) {
@@ -128,6 +142,13 @@ export class BillingRepository extends PrismaRepository {
     await tx.checkoutSession.update({
       where: { id: sessionId },
       data: { status: 'COMPLETED', completedAt: new Date() },
+    });
+  }
+
+  failCheckout(sessionId: string, reason: string, tx: Transaction) {
+    return tx.checkoutSession.update({
+      where: { id: sessionId },
+      data: { status: 'FAILED', failureReason: reason },
     });
   }
 

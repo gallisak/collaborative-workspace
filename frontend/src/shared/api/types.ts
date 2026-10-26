@@ -17,3 +17,4 @@ export type AccessLevel = Schemas['AccessLevel'];
 export type Plan = Schemas['PlanDto'];
 export type WorkspaceBilling = Schemas['WorkspaceBillingDto'];
 export type CheckoutSession = Schemas['CheckoutSessionDto'];
+export type SharedDocument = Schemas['SharedDocumentDto'];

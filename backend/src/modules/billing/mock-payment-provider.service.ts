@@ -36,6 +36,9 @@ export class MockPaymentProvider {
     if (session.status === 'COMPLETED') {
       throw new ConflictException('This checkout session is already paid');
     }
+    if (session.status === 'FAILED') {
+      throw new ConflictException(session.failureReason ?? 'This checkout session has failed');
+    }
     if (!isCheckoutOpen(session, new Date())) {
       await this.billing.expireCheckout(sessionId);
       throw new BadRequestException('This checkout session has expired');

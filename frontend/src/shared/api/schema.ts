@@ -244,6 +244,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shared-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SharedDocumentsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{documentId}": {
         parameters: {
             query?: never;
@@ -303,6 +319,70 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["DocumentsController_unshare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NotificationsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NotificationsController_unreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationsController_markAllRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationsController_markRead"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -415,70 +495,6 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["CommentsController_remove"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["NotificationsController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/unread-count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["NotificationsController_unreadCount"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/read-all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["NotificationsController_markAllRead"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{notificationId}/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["NotificationsController_markRead"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -850,6 +866,17 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        /** @enum {string} */
+        AccessLevel: "VIEW" | "EDIT";
+        SharedDocumentDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            workspaceId: string;
+            workspaceName: string;
+            title: string;
+            accessLevel: components["schemas"]["AccessLevel"];
+        };
         UpdateDocumentDto: {
             /** @example Roadmap Q4 */
             title: string;
@@ -866,8 +893,6 @@ export interface components {
              */
             afterId?: string | null;
         };
-        /** @enum {string} */
-        AccessLevel: "VIEW" | "EDIT";
         DocumentPermissionDto: {
             /** Format: uuid */
             userId: string;
@@ -879,6 +904,43 @@ export interface components {
             /** @example bob@collab.local */
             email: string;
             accessLevel: components["schemas"]["AccessLevel"];
+        };
+        /** @enum {string} */
+        NotificationType: "MENTION";
+        NotificationActorDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        NotificationDocumentDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            workspaceId: string;
+            title: string;
+        };
+        NotificationCommentDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            threadId: string;
+            /** @description Beginning of the comment text */
+            excerpt: string;
+        };
+        NotificationDto: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["NotificationType"];
+            actor: components["schemas"]["NotificationActorDto"] | null;
+            document: components["schemas"]["NotificationDocumentDto"] | null;
+            comment: components["schemas"]["NotificationCommentDto"] | null;
+            /** Format: date-time */
+            readAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        UnreadCountDto: {
+            count: number;
         };
         /** @enum {string} */
         VersionKind: "AUTO" | "MANUAL";
@@ -960,43 +1022,6 @@ export interface components {
         UpdateThreadDto: {
             resolved: boolean;
         };
-        /** @enum {string} */
-        NotificationType: "MENTION";
-        NotificationActorDto: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-        };
-        NotificationDocumentDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            workspaceId: string;
-            title: string;
-        };
-        NotificationCommentDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            threadId: string;
-            /** @description Beginning of the comment text */
-            excerpt: string;
-        };
-        NotificationDto: {
-            /** Format: uuid */
-            id: string;
-            type: components["schemas"]["NotificationType"];
-            actor: components["schemas"]["NotificationActorDto"] | null;
-            document: components["schemas"]["NotificationDocumentDto"] | null;
-            comment: components["schemas"]["NotificationCommentDto"] | null;
-            /** Format: date-time */
-            readAt: string | null;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        UnreadCountDto: {
-            count: number;
-        };
         CreateShareLinkDto: {
             accessLevel: components["schemas"]["AccessLevel"];
             /**
@@ -1059,7 +1084,7 @@ export interface components {
             planId: "PRO" | "TEAM";
         };
         /** @enum {string} */
-        CheckoutSessionStatus: "OPEN" | "COMPLETED" | "EXPIRED";
+        CheckoutSessionStatus: "OPEN" | "COMPLETED" | "EXPIRED" | "FAILED";
         CheckoutSessionDto: {
             /** Format: uuid */
             id: string;
@@ -1067,6 +1092,8 @@ export interface components {
             workspaceId: string;
             plan: components["schemas"]["PlanDto"];
             status: components["schemas"]["CheckoutSessionStatus"];
+            /** @description Why a paid checkout was not applied, set when the status is FAILED */
+            failureReason: string | null;
             /** Format: date-time */
             expiresAt: string;
             /** @description Page of the mock payment provider */
@@ -1761,6 +1788,26 @@ export interface operations {
             };
         };
     };
+    SharedDocumentsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pages shared with you in workspaces you are not a member of */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedDocumentDto"][];
+                };
+            };
+        };
+    };
     DocumentsController_get: {
         parameters: {
             query?: never;
@@ -1807,7 +1854,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Requires edit access */
+            /** @description Requires edit access to the document and every subpage */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2007,6 +2054,91 @@ export interface operations {
                 content?: never;
             };
             /** @description Document does not exist or you have no access */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_list: {
+        parameters: {
+            query?: {
+                /** @description Return notifications older than this one */
+                before?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDto"][];
+                };
+            };
+        };
+    };
+    NotificationsController_unreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Notification does not exist or is not yours */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2329,91 +2461,6 @@ export interface operations {
                 content?: never;
             };
             /** @description Thread or comment does not exist, or you have no access */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    NotificationsController_list: {
-        parameters: {
-            query?: {
-                /** @description Return notifications older than this one */
-                before?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotificationDto"][];
-                };
-            };
-        };
-    };
-    NotificationsController_unreadCount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UnreadCountDto"];
-                };
-            };
-        };
-    };
-    NotificationsController_markAllRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    NotificationsController_markRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                notificationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Notification does not exist or is not yours */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -1,5 +1,5 @@
 import 'server-only';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import createClient from 'openapi-fetch';
 import { cache } from 'react';
@@ -24,11 +24,14 @@ export const publicApi = createClient<paths>({ baseUrl: serverEnv.API_INTERNAL_U
 export type ServerApi = Awaited<ReturnType<typeof serverApi>>;
 
 export async function serverApi() {
-  const cookieHeader = (await cookies()).toString();
+  const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()]);
+  const cookieHeader = cookieStore.toString();
+  const clientIp = requestHeaders.get('x-forwarded-for');
   return createClient<paths>({
     baseUrl: serverEnv.API_INTERNAL_URL,
     headers: {
       ...(cookieHeader && { cookie: cookieHeader }),
+      ...(clientIp && { 'x-forwarded-for': clientIp }),
       origin: new URL(serverEnv.FRONTEND_URL).origin,
     },
     fetch: uncachedFetch,

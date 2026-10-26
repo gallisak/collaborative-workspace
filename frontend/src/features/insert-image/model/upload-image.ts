@@ -5,7 +5,7 @@ type ImageType = (typeof IMAGE_TYPES)[number];
 
 const isImageType = (type: string): type is ImageType =>
   (IMAGE_TYPES as readonly string[]).includes(type);
-export const MAX_IMAGE_BYTES = 1024 * 1024;
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 export class UploadError extends Error {}
 
@@ -14,7 +14,7 @@ export function checkImage(file: File): string | null {
     return 'Choose a PNG, JPEG, GIF or WebP image';
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    return 'Images can be up to 1 MB';
+    return 'Images can be up to 10 MB';
   }
   return null;
 }

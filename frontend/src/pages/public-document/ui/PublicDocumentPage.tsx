@@ -27,6 +27,7 @@ export async function generatePublicDocumentMetadata({
     title,
     description: document.description || undefined,
     alternates: { canonical: url },
+    robots: { index: true, follow: true },
     openGraph: {
       type: 'article',
       url,

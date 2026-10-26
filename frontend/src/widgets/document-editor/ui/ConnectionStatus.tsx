@@ -1,4 +1,4 @@
-import { CloudOff, Loader2, ShieldAlert, Wifi } from 'lucide-react';
+import { CloudOff, Loader2, RefreshCw, ShieldAlert, TriangleAlert, Wifi } from 'lucide-react';
 import type { SessionSnapshot } from '../model/collab-session';
 
 const STATUS = {
@@ -11,6 +11,16 @@ const STATUS = {
   },
   'lost-access': { icon: ShieldAlert, label: 'No access', tone: 'text-destructive' },
   unauthorized: { icon: ShieldAlert, label: 'Signed out', tone: 'text-destructive' },
+  'access-changed': {
+    icon: RefreshCw,
+    label: 'Your access changed, reloading…',
+    tone: 'text-amber-600',
+  },
+  failed: {
+    icon: TriangleAlert,
+    label: 'Sync failed: copy your changes and reload the page',
+    tone: 'text-destructive',
+  },
 } as const;
 
 export function ConnectionStatus({ snapshot }: { snapshot: SessionSnapshot }) {

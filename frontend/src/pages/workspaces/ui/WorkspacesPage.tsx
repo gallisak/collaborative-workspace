@@ -1,6 +1,7 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { displayTitle } from '@/entities/document';
 import { ROLE_LABELS } from '@/entities/workspace';
 import { CreateWorkspaceForm } from '@/features/create-workspace';
 import { getSessionUser, load } from '@/shared/dal';
@@ -48,6 +49,42 @@ async function WorkspaceList() {
   );
 }
 
+async function SharedWithYou() {
+  const shared = await load((api) => api.GET('/api/shared-documents'));
+  if (shared.length === 0) {
+    return null;
+  }
+  return (
+    <section aria-labelledby="shared-heading" className="grid gap-3">
+      <h2 id="shared-heading" className="text-lg font-semibold tracking-tight">
+        Shared with you
+      </h2>
+      <ul className="grid gap-2">
+        {shared.map((document) => (
+          <li key={document.id}>
+            <Link
+              href={routes.document(document.workspaceId, document.id)}
+              className="hover:bg-accent flex items-center gap-3 rounded-lg border p-4 transition-colors"
+            >
+              <FileText className="text-muted-foreground size-4 shrink-0" />
+              <span className="grid min-w-0 flex-1">
+                <span className="truncate font-medium">{displayTitle(document.title)}</span>
+                <span className="text-muted-foreground truncate text-xs">
+                  {document.workspaceName}
+                </span>
+              </span>
+              <Badge variant="secondary">
+                {document.accessLevel === 'EDIT' ? 'Can edit' : 'Can view'}
+              </Badge>
+              <ChevronRight className="text-muted-foreground size-4" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function WorkspacesPage() {
   return (
     <main className="mx-auto grid w-full max-w-2xl gap-8 p-6 md:py-12">
@@ -66,6 +103,9 @@ export function WorkspacesPage() {
         }
       >
         <WorkspaceList />
+      </Suspense>
+      <Suspense fallback={null}>
+        <SharedWithYou />
       </Suspense>
       <Card>
         <CardHeader>

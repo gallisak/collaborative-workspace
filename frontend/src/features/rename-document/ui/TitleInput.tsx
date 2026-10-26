@@ -1,14 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MAX_TITLE_LENGTH, useRenameDocument } from '../model/use-rename-document';
 
 export function TitleInput({ documentId, title }: { documentId: string; title: string }) {
   const rename = useRenameDocument();
   const [saved, setSaved] = useState(title);
   const [value, setValue] = useState(title);
+  const cancelled = useRef(false);
 
   const commit = async () => {
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
     if (await rename(documentId, value, saved)) {
       setSaved(value.trim());
     } else {
@@ -30,6 +35,7 @@ export function TitleInput({ documentId, title }: { documentId: string; title: s
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
+          cancelled.current = true;
           setValue(saved);
           event.currentTarget.blur();
         }

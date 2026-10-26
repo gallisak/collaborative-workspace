@@ -32,7 +32,7 @@ export class TokenService {
 
   async issue(user: AuthUser, familyId: string = randomUUID(), tx?: Transaction) {
     const issuedAt = Date.now();
-    const payload: AccessTokenPayload = { sub: user.id, iatMs: issuedAt };
+    const payload: AccessTokenPayload = { sub: user.id, fid: familyId, iatMs: issuedAt };
     const accessToken = await this.jwt.signAsync(payload, {
       secret: this.config.get('JWT_ACCESS_SECRET', { infer: true }),
       expiresIn: this.accessTtlSeconds,
@@ -73,6 +73,18 @@ export class TokenService {
     return { id: payload.sub };
   }
 
+  async isAccessTokenRevoked(token: string): Promise<boolean> {
+    try {
+      const payload = await this.jwt.verifyAsync<AccessTokenPayload>(token, {
+        secret: this.config.get('JWT_ACCESS_SECRET', { infer: true }),
+        ignoreExpiration: true,
+      });
+      return await this.revocation.isRevoked(payload);
+    } catch {
+      return true;
+    }
+  }
+
   async rotate(refreshToken: string): Promise<{ user: User; tokens: IssuedTokens }> {
     const stored = await this.refreshTokens.findByHashWithUser(this.hash(refreshToken));
     if (!stored || stored.expiresAt <= new Date()) {
@@ -109,6 +121,7 @@ export class TokenService {
     const stored = await this.refreshTokens.findFamilyByHash(this.hash(refreshToken));
     if (stored) {
       await this.refreshTokens.revokeFamily(stored.familyId);
+      await this.revocation.revokeFamily(stored.familyId);
     }
   }
 

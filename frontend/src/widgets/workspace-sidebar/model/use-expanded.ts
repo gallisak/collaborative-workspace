@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 
 const EMPTY = '[]';
+const NONE: ReadonlySet<string> = new Set();
 const memory = new Map<string, string>();
 const listeners = new Set<() => void>();
 
@@ -52,23 +53,33 @@ export function useExpanded(workspaceId: string, forced: readonly string[]) {
   );
   const stored = useMemo(() => parse(raw), [raw]);
   const forcedSet = useMemo(() => new Set(forced), [forced]);
+  const forcedKey = forced.join(',');
+  const [dismissed, setDismissed] = useState({ forcedKey, ids: NONE });
+  const dismissedIds = dismissed.forcedKey === forcedKey ? dismissed.ids : NONE;
 
   const isExpanded = useCallback(
-    (id: string) => stored.has(id) || forcedSet.has(id),
-    [stored, forcedSet],
+    (id: string) => stored.has(id) || (forcedSet.has(id) && !dismissedIds.has(id)),
+    [stored, forcedSet, dismissedIds],
   );
 
   const toggle = useCallback(
     (id: string, open?: boolean) => {
+      const expand = open ?? !isExpanded(id);
       const next = new Set(stored);
-      if (open ?? !isExpanded(id)) {
+      const nextDismissed = new Set(dismissedIds);
+      if (expand) {
         next.add(id);
+        nextDismissed.delete(id);
       } else {
         next.delete(id);
+        if (forcedSet.has(id)) {
+          nextDismissed.add(id);
+        }
       }
+      setDismissed({ forcedKey, ids: nextDismissed });
       write(key, next);
     },
-    [key, stored, isExpanded],
+    [key, stored, isExpanded, dismissedIds, forcedSet, forcedKey],
   );
 
   return { isExpanded, toggle };
