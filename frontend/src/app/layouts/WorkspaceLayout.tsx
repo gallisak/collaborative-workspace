@@ -3,6 +3,7 @@ import { DocumentTreeProvider } from '@/entities/document';
 import { canEditContent } from '@/entities/workspace';
 import { getSessionUser, load, loadOptional } from '@/shared/dal';
 import { Skeleton } from '@/shared/ui/skeleton';
+import { NotificationsBell } from '@/widgets/notifications';
 import { UserMenu } from '@/widgets/user-menu';
 import { WorkspaceSidebar } from '@/widgets/workspace-sidebar';
 
@@ -26,6 +27,7 @@ async function WorkspaceShell({ params, children }: WorkspaceLayoutProps) {
     <DocumentTreeProvider key={workspaceId} workspaceId={workspaceId} initialNodes={nodes}>
       <WorkspaceSidebar
         userMenu={<UserMenu user={user} />}
+        notifications={<NotificationsBell />}
         workspaceId={workspaceId}
         workspace={workspace}
         editable={workspace ? canEditContent(workspace.role) : false}

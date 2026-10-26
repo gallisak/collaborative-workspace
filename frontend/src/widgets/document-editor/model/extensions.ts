@@ -1,13 +1,10 @@
-import Collaboration from '@tiptap/extension-collaboration';
+import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
-import Image from '@tiptap/extension-image';
-import { TaskItem, TaskList } from '@tiptap/extension-list';
+import UniqueID from '@tiptap/extension-unique-id';
 import { Placeholder } from '@tiptap/extensions';
-import StarterKit from '@tiptap/starter-kit';
+import { COMMENTABLE_BLOCKS, CONTENT_FIELD, contentExtensions } from '@/entities/document';
 import type { CollabSession } from './collab-session';
-import { normalizeLink } from './link';
-
-export const CONTENT_FIELD = 'default';
+import { CommentHighlight } from './comment-highlight';
 
 interface CaretUser {
   name: string;
@@ -16,22 +13,12 @@ interface CaretUser {
 
 export function editorExtensions(session: CollabSession, user: CaretUser) {
   return [
-    StarterKit.configure({
-      undoRedo: false,
-      blockquote: false,
-      horizontalRule: false,
-      underline: false,
-      heading: { levels: [1, 2, 3] },
-      link: {
-        openOnClick: false,
-        autolink: true,
-        defaultProtocol: 'https',
-        isAllowedUri: (url) => normalizeLink(url) !== null,
-      },
+    ...contentExtensions(),
+    UniqueID.configure({
+      types: COMMENTABLE_BLOCKS,
+      filterTransaction: (transaction) => !isChangeOrigin(transaction),
     }),
-    TaskList,
-    TaskItem.configure({ nested: true }),
-    Image.configure({ inline: false, allowBase64: false }),
+    CommentHighlight,
     Placeholder.configure({ placeholder: 'Start writing…' }),
     Collaboration.configure({ document: session.doc, field: CONTENT_FIELD }),
     CollaborationCaret.configure({ provider: session.provider, user }),

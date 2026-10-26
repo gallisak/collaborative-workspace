@@ -169,3 +169,12 @@
     @apply absolute -top-5 -left-px rounded-sm px-1.5 py-0.5 text-xs leading-none font-medium whitespace-nowrap text-white select-none;
   }
 }
+
+@layer components {
+  .document-content .has-comments {
+    @apply -mx-2 cursor-pointer rounded-md bg-amber-100/60 px-2;
+  }
+  .document-content .is-active-comment {
+    @apply bg-amber-200/80 ring-1 ring-amber-400;
+  }
+}

@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
 import type { CollabSession } from '../model/collab-session';
+import { OPEN_BLOCK_EVENT, setCommentHighlights } from '../model/comment-highlight';
 import { editorExtensions } from '../model/extensions';
 import { colorFor } from '../model/presence';
 import { useCollabSession, useSessionSnapshot } from '../model/use-collab-session';
@@ -20,10 +21,18 @@ interface EditorUser {
   name: string;
 }
 
+export interface CommentBinding {
+  blockIds: readonly string[];
+  activeBlockId: string | null;
+  onOpenBlock: (blockId: string) => void;
+  onComment?: (blockId: string) => void;
+}
+
 interface DocumentEditorProps {
   documentId: string;
   user: EditorUser;
   editable: boolean;
+  comments: CommentBinding;
 }
 
 function EditorSkeleton() {
@@ -40,10 +49,12 @@ function CollaborativeEditor({
   session,
   user,
   editable,
+  comments,
 }: {
   session: CollabSession;
   user: EditorUser;
   editable: boolean;
+  comments: CommentBinding;
 }) {
   const snapshot = useSessionSnapshot(session);
   const editor = useEditor(
@@ -63,6 +74,28 @@ function CollaborativeEditor({
   useEffect(() => {
     editor?.setEditable(writable);
   }, [editor, writable]);
+
+  const { onOpenBlock } = comments;
+  useEffect(() => {
+    const element = editor?.view.dom;
+    if (!element) {
+      return;
+    }
+    const listener = (event: Event) => onOpenBlock((event as CustomEvent<string>).detail);
+    element.addEventListener(OPEN_BLOCK_EVENT, listener);
+    return () => element.removeEventListener(OPEN_BLOCK_EVENT, listener);
+  }, [editor, onOpenBlock]);
+
+  const highlightKey = comments.blockIds.join(',');
+  useEffect(() => {
+    if (editor && snapshot.synced) {
+      setCommentHighlights(
+        editor,
+        highlightKey ? highlightKey.split(',') : [],
+        comments.activeBlockId,
+      );
+    }
+  }, [editor, snapshot.synced, highlightKey, comments.activeBlockId]);
 
   return (
     <div className="grid gap-2">
@@ -89,17 +122,27 @@ function CollaborativeEditor({
           </AlertDescription>
         </Alert>
       )}
-      {editor && editable && <EditorToolbar editor={editor} disabled={!writable} />}
+      {editor && editable && (
+        <EditorToolbar editor={editor} disabled={!writable} onComment={comments.onComment} />
+      )}
       {!snapshot.synced && <EditorSkeleton />}
       <EditorContent editor={editor} className={snapshot.synced ? undefined : 'hidden'} />
     </div>
   );
 }
 
-export function DocumentEditor({ documentId, user, editable }: DocumentEditorProps) {
+export function DocumentEditor({ documentId, user, editable, comments }: DocumentEditorProps) {
   const session = useCollabSession(documentId);
   if (!session) {
     return <EditorSkeleton />;
   }
-  return <CollaborativeEditor key={documentId} session={session} user={user} editable={editable} />;
+  return (
+    <CollaborativeEditor
+      key={documentId}
+      session={session}
+      user={user}
+      editable={editable}
+      comments={comments}
+    />
+  );
 }

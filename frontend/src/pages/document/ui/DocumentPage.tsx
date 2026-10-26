@@ -1,51 +1,55 @@
 import { Suspense } from 'react';
-import { displayTitle } from '@/entities/document';
-import { TitleInput } from '@/features/rename-document';
-import { getSessionUser, load } from '@/shared/dal';
+import { getSessionUser, load, loadOptional } from '@/shared/dal';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { DocumentEditor } from '@/widgets/document-editor';
+import { DocumentWorkspace } from './DocumentWorkspace';
 
 interface DocumentPageProps {
   params: Promise<{ workspaceId: string; documentId: string }>;
 }
 
 async function DocumentView({ params }: DocumentPageProps) {
-  const { documentId } = await params;
-  const [document, user] = await Promise.all([
-    load((api) => api.GET('/api/documents/{documentId}', { params: { path: { documentId } } })),
+  const { workspaceId, documentId } = await params;
+  const path = { params: { path: { documentId } } };
+  const [document, user, members] = await Promise.all([
+    load((api) => api.GET('/api/documents/{documentId}', path)),
     getSessionUser(),
+    loadOptional((api) =>
+      api.GET('/api/workspaces/{workspaceId}/members', { params: { path: { workspaceId } } }),
+    ),
   ]);
-  const editable = document.access === 'EDIT' || document.access === 'MANAGE';
+  const canModerate = document.access === 'MANAGE';
+  const grants = canModerate
+    ? await load((api) => api.GET('/api/documents/{documentId}/permissions', path))
+    : [];
+  const candidates = new Map(
+    [...(members ?? []), ...grants]
+      .filter((person) => person.userId !== user.id)
+      .map((person) => [person.userId, { id: person.userId, name: person.name }]),
+  );
 
   return (
-    <article className="grid gap-4">
-      {editable ? (
-        <TitleInput key={document.id} documentId={document.id} title={document.title} />
-      ) : (
-        <h1 className="text-4xl font-bold tracking-tight">{displayTitle(document.title)}</h1>
-      )}
-      <DocumentEditor
-        documentId={document.id}
-        user={{ id: user.id, name: user.name }}
-        editable={editable}
-      />
-    </article>
+    <DocumentWorkspace
+      documentId={document.id}
+      title={document.title}
+      user={{ id: user.id, name: user.name }}
+      editable={document.access === 'EDIT' || canModerate}
+      canModerate={canModerate}
+      candidates={[...candidates.values()]}
+    />
   );
 }
 
 export function DocumentPage(props: DocumentPageProps) {
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-14">
-      <Suspense
-        fallback={
-          <div className="grid gap-4">
-            <Skeleton className="h-12 w-2/3" />
-            <Skeleton className="h-40" />
-          </div>
-        }
-      >
-        <DocumentView {...props} />
-      </Suspense>
-    </main>
+    <Suspense
+      fallback={
+        <div className="mx-auto grid w-full max-w-3xl gap-4 px-6 py-14">
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-40" />
+        </div>
+      }
+    >
+      <DocumentView {...props} />
+    </Suspense>
   );
 }

@@ -14,6 +14,7 @@ import { DocumentTree } from './DocumentTree';
 
 interface WorkspaceSidebarProps {
   userMenu: ReactNode;
+  notifications: ReactNode;
   workspaceId: string;
   workspace: WorkspaceDetails | null;
   editable: boolean;
@@ -38,6 +39,7 @@ function NavLink({ href, icon, label }: { href: string; icon: ReactNode; label: 
 
 export function WorkspaceSidebar({
   userMenu,
+  notifications,
   workspaceId,
   workspace,
   editable,
@@ -67,7 +69,10 @@ export function WorkspaceSidebar({
           </ScrollArea>
         </>
       )}
-      <div className="mt-auto border-t pt-2">{userMenu}</div>
+      <div className="mt-auto flex items-center gap-1 border-t pt-2">
+        <div className="min-w-0 flex-1">{userMenu}</div>
+        {notifications}
+      </div>
     </aside>
   );
 }

@@ -3,10 +3,10 @@
 import type { Editor } from '@tiptap/react';
 import { Link2 } from 'lucide-react';
 import { useState } from 'react';
+import { normalizeLink } from '@/entities/document';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
-import { normalizeLink } from '../model/link';
 
 interface LinkButtonProps {
   editor: Editor;

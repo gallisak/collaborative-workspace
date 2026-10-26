@@ -3,6 +3,7 @@
 import { type Editor, useEditorState } from '@tiptap/react';
 import {
   Bold,
+  MessageSquarePlus,
   Code,
   Italic,
   List,
@@ -14,8 +15,10 @@ import {
   Undo2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import { blockAtSelection } from '../model/comment-highlight';
 import { LinkButton } from './LinkButton';
 
 const BLOCKS = [
@@ -56,7 +59,13 @@ function ToolButton({
   );
 }
 
-export function EditorToolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
+interface EditorToolbarProps {
+  editor: Editor;
+  disabled: boolean;
+  onComment?: (blockId: string) => void;
+}
+
+export function EditorToolbar({ editor, disabled, onComment }: EditorToolbarProps) {
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -192,6 +201,25 @@ export function EditorToolbar({ editor, disabled }: { editor: Editor; disabled: 
       >
         <Redo2 />
       </ToolButton>
+      {onComment && (
+        <>
+          <span className="bg-border mx-1 h-5 w-px" />
+          <ToolButton
+            label="Comment on block"
+            disabled={disabled}
+            onClick={() => {
+              const blockId = blockAtSelection(editor);
+              if (blockId) {
+                onComment(blockId);
+              } else {
+                toast.info('Place the cursor in a paragraph, heading, code block or image');
+              }
+            }}
+          >
+            <MessageSquarePlus />
+          </ToolButton>
+        </>
+      )}
     </div>
   );
 }

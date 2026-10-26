@@ -1,4 +1,4 @@
-import { normalizeLink } from './link';
+import { normalizeLink } from './editor-schema';
 
 describe('normalizeLink', () => {
   it('accepts web and mail links, adding https when missing', () => {

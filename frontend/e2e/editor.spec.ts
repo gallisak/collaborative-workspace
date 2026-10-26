@@ -1,63 +1,12 @@
-import type { Browser, BrowserContext, Page } from '@playwright/test';
-import { expect, newAccount, PASSWORD, test } from './fixtures';
-
-interface Session {
-  context: BrowserContext;
-  page: Page;
-  name: string;
-  email: string;
-}
-
-async function openSession(browser: Browser, baseURL: string, name: string): Promise<Session> {
-  const context = await browser.newContext({ baseURL });
-  const page = await context.newPage();
-  const account = newAccount(name);
-  const response = await page.request.post('/api/auth/register', {
-    data: { ...account, password: PASSWORD },
-    headers: { origin: baseURL },
-  });
-  expect(response.status()).toBe(201);
-  return { context, page, ...account };
-}
-
-async function createDocument(owner: Session, baseURL: string, title: string) {
-  const headers = { origin: baseURL };
-  const workspace = await owner.page.request.post('/api/workspaces', {
-    data: { name: 'Editor team' },
-    headers,
-  });
-  const workspaceId = ((await workspace.json()) as { id: string }).id;
-  const document = await owner.page.request.post(`/api/workspaces/${workspaceId}/documents`, {
-    data: { title },
-    headers,
-  });
-  const documentId = ((await document.json()) as { id: string }).id;
-  return { workspaceId, documentId, url: `/w/${workspaceId}/d/${documentId}` };
-}
-
-async function share(
-  owner: Session,
-  baseURL: string,
-  documentId: string,
-  email: string,
-  accessLevel: 'VIEW' | 'EDIT',
-) {
-  const response = await owner.page.request.put(`/api/documents/${documentId}/permissions`, {
-    data: { email, accessLevel },
-    headers: { origin: baseURL },
-  });
-  expect(response.status()).toBe(204);
-}
-
-const editor = (page: Page) => page.getByRole('textbox', { name: 'Document content' });
-const status = (page: Page) =>
-  page.getByRole('status').filter({ hasText: /Saved|Connecting|Offline|No access/ });
-
-async function openEditor(page: Page, url: string) {
-  await page.goto(url);
-  await expect(status(page)).toHaveText('Saved');
-  await expect(editor(page)).toBeVisible();
-}
+import {
+  connection as status,
+  createDocument,
+  editor,
+  openEditor,
+  openSession,
+  share,
+} from './documents';
+import { expect, test } from './fixtures';
 
 test.describe('document editor', () => {
   test('writes every block type and keeps the content after a reload', async ({
