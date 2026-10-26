@@ -7,7 +7,7 @@ Notion-like collaborative workspace: nested pages, block editor with real-time C
 ## Structure
 
 ```
-backend/     NestJS — one codebase, several processes:
+backend/     NestJS — one codebase, one Docker image, several processes:
                src/main.ts    REST API          :4000
                src/collab.ts  collab gateway    :4001 (Yjs over WebSocket)
                src/worker.ts  background jobs   :4002 (BullMQ: notifications, search indexing, page revalidation, billing events, upload cleanup)
@@ -22,13 +22,29 @@ docker/      container init scripts
 
 `frontend/pages/` is intentionally empty: without a root `pages/` folder Next.js would treat the FSD `src/pages` layer as the legacy Pages Router.
 
+## Running with Docker
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+This starts Postgres, Redis and MinIO, applies migrations and seeds demo data (one-shot `migrate`
+container, `SEED_DEMO_DATA=false` to skip), then runs `api` (:4000), `collab` (:4001) and
+`worker` (:4002) from one backend image. The image is a multi-stage build: `build` compiles,
+`migrate` keeps the Prisma CLI, `runtime` contains only production dependencies and the compiled
+code and runs as the unprivileged `node` user. Every service has a healthcheck on
+`/health/ready`; backend services start only after migrations succeeded and the bucket exists.
+Containers run with `NODE_ENV=development` by default so that the example secrets are accepted;
+production requires real secrets (see [Environment profiles](#environment-profiles)).
+
 ## Local development
 
 Requirements: Node 24, npm, Docker.
 
 ```bash
 cp .env.example .env
-docker compose up -d                 # postgres :5432, redis :6380, minio :9000 (console :9001)
+docker compose up -d postgres redis minio minio-init   # :5432, :6380, :9000 (console :9001)
 
 cd backend
 npm install                          # also generates the Prisma client
