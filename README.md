@@ -113,7 +113,9 @@ docker/      container init scripts, nginx ingress config
   authority for users and permissions, and three processes plus the Next.js server need to verify
   a session. A signed access token (15 min) is verified locally by each of them from an `httpOnly`
   cookie, without a session store; the WebSocket gateway reads the same cookie. Refresh tokens
-  (30 days) rotate on every use, and reusing a rotated one revokes the whole session.
+  (30 days) rotate on every use, and reusing a rotated one revokes the whole session. Two tabs that
+  refresh at the same moment are told apart from theft by a short grace window that only accepts
+  the same device (IP and browser) that rotated the token.
 
 `frontend/pages/` is intentionally empty, otherwise Next.js would treat the FSD `src/pages` layer
 as the Pages Router.

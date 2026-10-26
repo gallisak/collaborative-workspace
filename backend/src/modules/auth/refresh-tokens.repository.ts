@@ -21,20 +21,19 @@ export class RefreshTokensRepository extends PrismaRepository {
     });
   }
 
-  async markRotated(id: string, at: Date, tx: Transaction) {
+  async markRotated(id: string, at: Date, client: string, tx: Transaction) {
     const { count } = await tx.refreshToken.updateMany({
       where: { id, revokedAt: null },
-      data: { revokedAt: at, rotatedAt: at },
+      data: { revokedAt: at, rotatedAt: at, rotatedFrom: client },
     });
     return count === 1;
   }
 
-  async rotatedAt(id: string, tx: Transaction) {
-    const { rotatedAt } = await tx.refreshToken.findUniqueOrThrow({
+  rotation(id: string, tx: Transaction) {
+    return tx.refreshToken.findUniqueOrThrow({
       where: { id },
-      select: { rotatedAt: true },
+      select: { rotatedAt: true, rotatedFrom: true },
     });
-    return rotatedAt;
   }
 
   countActiveInFamily(familyId: string, tx: Transaction) {

@@ -179,6 +179,18 @@ describe('Auth (e2e)', () => {
       }
     });
 
+    it('treats a quick reuse from another device as theft', async () => {
+      const { setCookies } = await registerUser(app);
+      const stolen = sessionCookies(setCookies);
+      const rotated = await refresh(stolen).set('User-Agent', 'Owner browser').expect(200);
+      const owner = sessionCookies(rotated.get('Set-Cookie') ?? []);
+
+      await refresh(stolen).set('User-Agent', 'Attacker tool').expect(401);
+
+      await refresh(owner).set('User-Agent', 'Owner browser').expect(401);
+      await me(owner).expect(401);
+    });
+
     it('treats a late reuse as theft and revokes the session and access tokens', async () => {
       const { user, setCookies } = await registerUser(app);
       const first = sessionCookies(setCookies);

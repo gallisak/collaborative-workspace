@@ -9,7 +9,12 @@ import type { Env } from '../../infra/config/env.schema.js';
 import { type Transaction, UnitOfWork } from '../../infra/prisma/unit-of-work.js';
 import { AccessTokenRevocationService } from './access-token-revocation.service.js';
 import { RefreshTokensRepository } from './refresh-tokens.repository.js';
-import { isWithinRotationGrace } from './token-rules.js';
+import { canReuseRotated } from './token-rules.js';
+
+export interface RefreshClient {
+  ip: string;
+  userAgent: string;
+}
 
 @Injectable()
 export class TokenService {
@@ -85,21 +90,26 @@ export class TokenService {
     }
   }
 
-  async rotate(refreshToken: string): Promise<{ user: User; tokens: IssuedTokens }> {
+  async rotate(
+    refreshToken: string,
+    client: RefreshClient,
+  ): Promise<{ user: User; tokens: IssuedTokens }> {
     const stored = await this.refreshTokens.findByHashWithUser(this.hash(refreshToken));
     if (!stored || stored.expiresAt <= new Date()) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+    const fingerprint = this.hash(`client:${client.ip}|${client.userAgent}`);
 
     const tokens = await this.uow.run(async (tx) => {
       const now = new Date();
-      if (await this.refreshTokens.markRotated(stored.id, now, tx)) {
+      if (await this.refreshTokens.markRotated(stored.id, now, fingerprint, tx)) {
         return this.issue(stored.user, stored.familyId, tx);
       }
 
-      const rotatedAt = await this.refreshTokens.rotatedAt(stored.id, tx);
+      const rotation = await this.refreshTokens.rotation(stored.id, tx);
       const familyActive = await this.refreshTokens.countActiveInFamily(stored.familyId, tx);
-      return familyActive > 0 && isWithinRotationGrace(rotatedAt, now, this.rotationGraceSeconds)
+      return familyActive > 0 &&
+        canReuseRotated(rotation, fingerprint, now, this.rotationGraceSeconds)
         ? this.issue(stored.user, stored.familyId, tx)
         : null;
     });

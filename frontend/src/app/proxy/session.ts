@@ -40,9 +40,14 @@ function parseSetCookies(setCookies: string[]) {
   return cookies;
 }
 
+interface ClientHeaders {
+  ip: string | null;
+  userAgent: string | null;
+}
+
 async function refresh(
   refreshToken: string,
-  clientIp: string | null,
+  client: ClientHeaders,
   { apiUrl, appOrigin }: SessionProxyOptions,
 ): Promise<RefreshedSession | null> {
   try {
@@ -51,7 +56,8 @@ async function refresh(
       headers: {
         cookie: `${REFRESH_COOKIE}=${refreshToken}`,
         origin: appOrigin,
-        ...(clientIp && { 'x-forwarded-for': clientIp }),
+        ...(client.ip && { 'x-forwarded-for': client.ip }),
+        ...(client.userAgent && { 'user-agent': client.userAgent }),
       },
       cache: 'no-store',
     });
@@ -85,7 +91,14 @@ export async function sessionProxy(request: NextRequest, options: SessionProxyOp
 
   const session =
     !accessFresh && refreshToken
-      ? await refresh(refreshToken, request.headers.get('x-forwarded-for'), options)
+      ? await refresh(
+          refreshToken,
+          {
+            ip: request.headers.get('x-forwarded-for'),
+            userAgent: request.headers.get('user-agent'),
+          },
+          options,
+        )
       : null;
   const signedIn = accessFresh || session !== null;
   const staleCookies = !signedIn && (access !== undefined || refreshToken !== undefined);
