@@ -5,7 +5,10 @@ import { defineConfig } from 'prisma/config';
 const envFile = (name: string) => fileURLToPath(new URL(`../${name}`, import.meta.url));
 
 config({
-  path: [envFile(`.env.${process.env.APP_ENV ?? process.env.NODE_ENV ?? 'development'}`), envFile('.env')],
+  path: [
+    envFile(`.env.${process.env.APP_ENV ?? process.env.NODE_ENV ?? 'development'}`),
+    envFile('.env'),
+  ],
   quiet: true,
 });
 
