@@ -55,8 +55,9 @@ export class BillingService {
 
   async overview(userId: string, workspaceId: string): Promise<WorkspaceBillingDto> {
     await this.workspaceAccess.requireMember(workspaceId, userId);
-    const [workspace, storageBytes] = await Promise.all([
+    const [workspace, guestEditors, storageBytes] = await Promise.all([
       this.billing.findWorkspace(workspaceId),
+      this.billing.countGuestEditors(workspaceId),
       this.attachments.uploadedBytes(workspaceId),
     ]);
     return {
@@ -64,6 +65,7 @@ export class BillingService {
       subscription: workspace.subscription,
       usage: {
         members: workspace._count.members,
+        guestEditors,
         pendingInvitations: workspace._count.invitations,
         documents: workspace._count.documents,
         storageBytes: Number(storageBytes),

@@ -190,8 +190,9 @@ export class DocumentsRepository extends PrismaRepository {
     userId: string,
     accessLevel: AccessLevel,
     grantedById: string,
+    tx: Transaction,
   ) {
-    return this.prisma.documentPermission.upsert({
+    return tx.documentPermission.upsert({
       where: { documentId_userId: { documentId, userId } },
       create: { documentId, userId, accessLevel, grantedById },
       update: { accessLevel, grantedById },

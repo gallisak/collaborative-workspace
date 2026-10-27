@@ -249,6 +249,12 @@ a few seconds; access and deletion are always checked at query time.
 | Pro  | 10      | unlimited | 10 GB   |
 | Team | 50      | unlimited | 100 GB  |
 
+A member seat is taken by every member, every pending invitation and every person outside the
+workspace who can edit a page shared with them directly; otherwise sharing pages for editing would
+bypass the member limit. Guests with view access are free, as in Notion and Google Docs. Edit
+links from publishing are not seats: they belong to the page, not to a person, and can be revoked
+or expire at any time.
+
 Exceeding a limit returns `402` with an explanation, and the UI offers the plans.
 
 **Mock Stripe Checkout.**

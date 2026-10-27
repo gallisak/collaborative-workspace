@@ -16,7 +16,7 @@ import { UsersService } from '../users/users.service.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
 import { canAssignRole, canManageMembers } from '../permissions/workspace-roles.js';
 import { InvitationsRepository } from './invitations.repository.js';
-import { assertCapacity } from './plan-limits.js';
+import { assertCapacity, seatLimit } from './plan-limits.js';
 import type { AssignableRole, InvitationDto } from './workspaces.dto.js';
 import { WorkspacesRepository } from './workspaces.repository.js';
 
@@ -74,10 +74,10 @@ export class InvitationsService {
 
       const now = new Date();
       await this.invitations.revokeOpenForEmail(workspaceId, email, now, tx);
-      const used =
-        (await this.workspaces.countMembers(workspaceId, tx)) +
-        (await this.invitations.countPending(workspaceId, now, tx));
-      assertCapacity(this.memberLimit(workspace.plan), used);
+      assertCapacity(
+        seatLimit(workspace.plan),
+        await this.workspaces.countSeats(workspaceId, now, tx, { email }),
+      );
 
       const created = await this.invitations.create(
         {
@@ -134,18 +134,14 @@ export class InvitationsService {
         return;
       }
       assertCapacity(
-        this.memberLimit(workspace.plan),
-        await this.workspaces.countMembers(workspaceId, tx),
+        seatLimit(workspace.plan),
+        await this.workspaces.countSeats(workspaceId, new Date(), tx, { userId }),
       );
       await this.workspaces.addMember(workspaceId, userId, invitation.role, tx);
     });
 
     this.logger.log({ workspaceId, userId, invitationId: invitation.id }, 'Invitation accepted');
     return { workspaceId };
-  }
-
-  private memberLimit(plan: { name: string; maxMembers: number | null }) {
-    return { planName: plan.name, resource: 'members', limit: plan.maxMembers };
   }
 
   private async lockWorkspace(workspaceId: string, tx: Transaction) {

@@ -9,13 +9,15 @@ export interface PlanCapacity {
 
 export interface WorkspaceUsage {
   members: number;
+  guestEditors: number;
   documents: number;
   storageBytes: bigint;
 }
 
 export function planMisfit(plan: PlanCapacity, usage: WorkspaceUsage): string | null {
-  if (plan.maxMembers !== null && usage.members > plan.maxMembers) {
-    return `The ${plan.name} plan allows up to ${plan.maxMembers} members, the workspace has ${usage.members}. Remove members first.`;
+  const seats = usage.members + usage.guestEditors;
+  if (plan.maxMembers !== null && seats > plan.maxMembers) {
+    return `The ${plan.name} plan allows up to ${plan.maxMembers} members, the workspace has ${seats} (guest editors included). Remove members or guest editors first.`;
   }
   if (plan.maxDocuments !== null && usage.documents > plan.maxDocuments) {
     return `The ${plan.name} plan allows up to ${plan.maxDocuments} documents, the workspace has ${usage.documents}. Delete documents first.`;

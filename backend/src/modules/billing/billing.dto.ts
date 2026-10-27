@@ -46,6 +46,11 @@ export class UsageDto {
   @ApiProperty()
   members: number;
 
+  @ApiProperty({
+    description: 'People outside the workspace with edit access to a page, they take a member seat',
+  })
+  guestEditors: number;
+
   @ApiProperty({ description: 'Open invitations, they take a member seat until they expire' })
   pendingInvitations: number;
 

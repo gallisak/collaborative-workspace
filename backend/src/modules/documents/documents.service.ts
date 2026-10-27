@@ -17,7 +17,7 @@ import { PageRevalidationService } from '../publishing/page-revalidation.service
 import { SearchIndexingService } from '../search/search-indexing.service.js';
 import { WorkspaceAccessService } from '../permissions/workspace-access.service.js';
 import { UsersService } from '../users/users.service.js';
-import { assertCapacity } from '../workspaces/plan-limits.js';
+import { assertCapacity, seatLimit } from '../workspaces/plan-limits.js';
 import { WorkspacesRepository } from '../workspaces/workspaces.repository.js';
 import type {
   CreateDocumentDto,
@@ -201,7 +201,23 @@ export class DocumentsService {
     if (!target) {
       throw new NotFoundException('No registered user with this email');
     }
-    await this.documents.upsertPermission(documentId, target.id, dto.accessLevel, userId);
+    await this.uow.run(async (tx) => {
+      const workspace = await this.lockWorkspace(document.workspaceId, tx);
+      await this.documentAccess.require(documentId, userId, 'MANAGE', tx);
+      if (
+        dto.accessLevel === 'EDIT' &&
+        !(await this.workspaces.holdsSeat(workspace.id, target.id, tx))
+      ) {
+        assertCapacity(
+          seatLimit(workspace.plan),
+          await this.workspaces.countSeats(workspace.id, new Date(), tx, {
+            userId: target.id,
+            email: target.email,
+          }),
+        );
+      }
+      await this.documents.upsertPermission(documentId, target.id, dto.accessLevel, userId, tx);
+    });
     await this.collabEvents.accessChanged(document.workspaceId);
     this.logger.log(
       { documentId, userId, targetUserId: target.id, accessLevel: dto.accessLevel },

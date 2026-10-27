@@ -1069,6 +1069,8 @@ export interface components {
         };
         UsageDto: {
             members: number;
+            /** @description People outside the workspace with edit access to a page, they take a member seat */
+            guestEditors: number;
             /** @description Open invitations, they take a member seat until they expire */
             pendingInvitations: number;
             documents: number;

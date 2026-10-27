@@ -1,7 +1,7 @@
 import { planMisfit } from './plan-fit.js';
 
 const pro = { name: 'Pro', maxMembers: 10, maxDocuments: null, maxStorageBytes: 10n * 1024n ** 3n };
-const usage = { members: 10, documents: 5000, storageBytes: 1024n };
+const usage = { members: 10, guestEditors: 0, documents: 5000, storageBytes: 1024n };
 
 describe('planMisfit', () => {
   it('accepts a workspace that fits the plan', () => {
@@ -10,6 +10,12 @@ describe('planMisfit', () => {
 
   it('rejects too many members', () => {
     expect(planMisfit(pro, { ...usage, members: 11 })).toMatch(/up to 10 members.*has 11/);
+  });
+
+  it('counts guest editors as members', () => {
+    expect(planMisfit(pro, { ...usage, members: 9, guestEditors: 2 })).toMatch(
+      /up to 10 members.*has 11 \(guest editors included\)/,
+    );
   });
 
   it('rejects too many documents', () => {

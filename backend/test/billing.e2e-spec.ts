@@ -82,6 +82,56 @@ describe('Billing (e2e)', () => {
       .send(payload);
   };
 
+  it('counts people outside the workspace with edit access against the member limit', async () => {
+    const { owner, workspaceId } = await setup();
+    const page = await owner
+      .post(`/api/workspaces/${workspaceId}/documents`)
+      .send({ title: 'Guest page' })
+      .expect(201);
+    const share = (email: string, accessLevel: string) =>
+      owner.put(`/api/documents/${page.body.id}/permissions`).send({ email, accessLevel });
+    const [first, second, third] = await Promise.all([signUp(app), signUp(app), signUp(app)]);
+
+    await share(first.email, 'EDIT').expect(204);
+    await share(second.email, 'EDIT').expect(204);
+    const blocked = await share(third.email, 'EDIT').expect(402);
+    expect(blocked.body.message).toBe(
+      'The Free plan allows up to 3 members, guest editors included. Upgrade the plan to add more.',
+    );
+    await share(third.email, 'VIEW').expect(204);
+    await share(first.email, 'EDIT').expect(204);
+    await invite(owner, workspaceId).expect(402);
+
+    const billing = await owner.get(`/api/workspaces/${workspaceId}/billing`).expect(200);
+    expect(billing.body.usage).toMatchObject({
+      members: 1,
+      guestEditors: 2,
+      pendingInvitations: 0,
+    });
+  });
+
+  it('does not count an invited person twice when a page is shared with them', async () => {
+    const { owner, workspaceId } = await setup();
+    const page = await owner
+      .post(`/api/workspaces/${workspaceId}/documents`)
+      .send({ title: 'Invited page' })
+      .expect(201);
+    const [invited, guest] = await Promise.all([signUp(app), signUp(app)]);
+    await owner
+      .post(`/api/workspaces/${workspaceId}/invitations`)
+      .send({ email: invited.email, role: 'VIEWER' })
+      .expect(201);
+    await owner
+      .put(`/api/documents/${page.body.id}/permissions`)
+      .send({ email: guest.email, accessLevel: 'EDIT' })
+      .expect(204);
+
+    await owner
+      .put(`/api/documents/${page.body.id}/permissions`)
+      .send({ email: invited.email, accessLevel: 'EDIT' })
+      .expect(204);
+  });
+
   it('upgrades the plan through checkout, mock payment and webhook, lifting the limits', async () => {
     const { owner, workspaceId } = await setup();
     await invite(owner, workspaceId).expect(201);
