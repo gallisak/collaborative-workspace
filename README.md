@@ -254,8 +254,8 @@ Exceeding a limit returns `402` with an explanation, and the UI offers the plans
 **Mock Stripe Checkout.**
 
 1. An owner or admin starts a checkout; the API creates a checkout session and returns its page.
-2. Paying builds a `checkout.session.completed` event, signs it with HMAC-SHA256 and delivers it to
-   `POST /api/billing/webhook`, exactly as an external provider would.
+2. Paying builds a `checkout.session.completed` event, signs it with HMAC-SHA256 and sends it over
+   HTTP to `POST /api/billing/webhook`, the same request an external provider would make.
 3. The webhook verifies the signature over the raw body (5 minute tolerance), stores the event by
    its provider id and answers `200` at once; processing runs in the worker.
 4. The worker locks the event, the session and the workspace, re-checks the limits of the new plan
