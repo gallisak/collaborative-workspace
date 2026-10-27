@@ -154,7 +154,10 @@ built from, only what changes while the user works.
   a failing section shows "Try again" without breaking the others.
 - **Proxy (`proxy.ts`, the Next 16 middleware).** Separates public routes from private ones,
   redirects signed-out users to the login page with a safe `next`, and refreshes an expired access
-  token before rendering.
+  token before rendering. This is the edge middleware of the spec: Next 16 renamed Middleware to
+  Proxy and runs it on the Node.js runtime only (a `runtime` option in `proxy.ts` is an error). It
+  stays light anyway: it reads cookies and calls the API only when the access token is missing or about
+  to expire.
 - **Server Actions vs real-time.** Settings-style mutations go through Server Actions (workspace,
   members, invitations, share links, checkout), each validated with zod. Tree operations call the
   API from the browser for instant feedback. Document content never goes through either: it is a
