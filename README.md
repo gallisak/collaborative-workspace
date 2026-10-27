@@ -295,7 +295,7 @@ through short-lived presigned URLs, to anyone only when the page is published.
 - **Validation.** DTOs with class-validator on the backend (unknown fields are rejected), zod on
   the frontend and in Server Actions.
 - **XSS.** User content is sanitized on the server before any server rendering; the editor accepts
-  only web and email links.
+  only web and email links, and public pages show external images only over `https`.
 - **CSRF.** `SameSite` cookies and an `Origin` check on every mutating request with a session.
 - **Rate limits** (Redis): sign-in per email and per IP, share link creation per user, everything
   else per IP. The ingress overwrites `X-Forwarded-For`, so the client address cannot be forged.

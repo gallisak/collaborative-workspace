@@ -20,7 +20,7 @@ const MAX_URL_LENGTH = 2048;
 const MAX_ALT_LENGTH = 500;
 const DESCRIPTION_LENGTH = 160;
 const LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
-const IMAGE_PROTOCOLS = new Set(['http:', 'https:']);
+const IMAGE_PROTOCOLS = new Set(['https:']);
 const SIMPLE_MARKS = ['bold', 'italic', 'strike', 'code'] as const;
 const LANGUAGE = /^[\w+#-]{1,32}$/;
 
