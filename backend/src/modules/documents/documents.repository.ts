@@ -66,8 +66,8 @@ export class DocumentsRepository extends PrismaRepository {
     return tx.document.create({ data });
   }
 
-  rename(id: string, title: string) {
-    return this.prisma.document.update({ where: { id }, data: { title } });
+  rename(id: string, title: string, tx: Transaction) {
+    return tx.document.update({ where: { id }, data: { title } });
   }
 
   move(id: string, parentId: string | null, position: string, tx: Transaction) {

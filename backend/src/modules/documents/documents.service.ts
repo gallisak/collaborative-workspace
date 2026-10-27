@@ -108,7 +108,11 @@ export class DocumentsService {
 
   async rename(userId: string, documentId: string, title: string): Promise<DocumentDto> {
     const { document } = await this.documentAccess.require(documentId, userId, 'EDIT');
-    await this.documents.rename(documentId, title);
+    await this.uow.run(async (tx) => {
+      await this.lockWorkspace(document.workspaceId, tx);
+      await this.documentAccess.require(documentId, userId, 'EDIT', tx);
+      await this.documents.rename(documentId, title, tx);
+    });
     await this.treeCache.invalidate(document.workspaceId);
     await this.search.schedule([documentId]);
     await this.pages.scheduleIfPublished([documentId]);
