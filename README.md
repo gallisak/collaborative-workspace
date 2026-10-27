@@ -120,7 +120,8 @@ docker/      container init scripts, nginx ingress config
   cookie, without a session store; the WebSocket gateway reads the same cookie. Refresh tokens
   (30 days) rotate on every use, and reusing a rotated one revokes the whole session. A 10 second
   grace window lets two tabs refresh at the same moment without being taken for theft; a token
-  revoked by logout is simply rejected.
+  revoked by logout is simply rejected. The collab gateway closes a WebSocket session (`4401`)
+  when its access token expires or is revoked, and the editor refreshes the session and reconnects.
 
 `frontend/pages/` is intentionally empty, otherwise Next.js would treat the FSD `src/pages` layer
 as the Pages Router.

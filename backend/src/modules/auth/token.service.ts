@@ -75,16 +75,16 @@ export class TokenService {
     return { id: payload.sub };
   }
 
-  async isAccessTokenRevoked(token: string): Promise<boolean> {
-    try {
-      const payload = await this.jwt.verifyAsync<AccessTokenPayload>(token, {
-        secret: this.config.get('JWT_ACCESS_SECRET', { infer: true }),
-        ignoreExpiration: true,
-      });
-      return await this.revocation.isRevoked(payload);
-    } catch {
-      return true;
-    }
+  async isAccessTokenValid(token: string): Promise<boolean> {
+    return this.verifyAccessToken(token).then(
+      () => true,
+      () => false,
+    );
+  }
+
+  accessTokenExpiresAt(token: string): Date | null {
+    const exp = this.jwt.decode<AccessTokenPayload | null>(token)?.exp;
+    return exp ? new Date(exp * 1000) : null;
   }
 
   async rotate(refreshToken: string): Promise<{ user: User; tokens: IssuedTokens }> {
