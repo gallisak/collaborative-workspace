@@ -109,6 +109,11 @@ frontend/    Next.js App Router + Feature-Sliced Design
 docker/      container init scripts, nginx ingress config
 ```
 
+- **One backend image, three processes.** The API, the collab gateway and the worker share the
+  modules, the Prisma client and the dependencies, so `backend/Dockerfile` builds one image and
+  compose runs it three times with a different command (`dist/main.js`, `dist/collab.js`,
+  `dist/worker.js`). It is one build, the three can never run different versions of the shared
+  code, and each still scales and restarts on its own.
 - **The collab gateway owns document content.** It keeps the live `Y.Doc` of every open document
   and is its only writer. The API checks access and enqueues work for it (manual versions,
   restores).
