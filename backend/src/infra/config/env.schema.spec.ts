@@ -1,4 +1,4 @@
-import { validateEnv } from './env.schema.js';
+import { envFilePaths, envProfile, validateEnv } from './env.schema.js';
 
 const validEnv = {
   DATABASE_URL: 'postgresql://collab:collab@localhost:5432/collab_docs',
@@ -60,5 +60,17 @@ describe('validateEnv in production', () => {
     });
 
     expect(env.NODE_ENV).toBe('production');
+  });
+});
+
+describe('envProfile', () => {
+  it('prefers APP_ENV so staging can run with NODE_ENV=production', () => {
+    expect(envProfile({ APP_ENV: 'staging', NODE_ENV: 'production' })).toBe('staging');
+    expect(envFilePaths('staging')[0]).toMatch(/\.env\.staging$/);
+  });
+
+  it('falls back to NODE_ENV and then to development', () => {
+    expect(envProfile({ NODE_ENV: 'test' })).toBe('test');
+    expect(envProfile({})).toBe('development');
   });
 });

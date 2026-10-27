@@ -16,6 +16,7 @@ const INSECURE_SECRET = /change-me/i;
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    APP_ENV: z.enum(['development', 'staging', 'test', 'production']).optional(),
     API_PORT: z.coerce.number().int().positive().default(4000),
     COLLAB_PORT: z.coerce.number().int().positive().default(4001),
     WORKER_PORT: z.coerce.number().int().positive().default(4002),
@@ -106,6 +107,10 @@ export function validateEnv(raw: Record<string, unknown>): Env {
 
 const repoRoot = new URL('../../../../', import.meta.url);
 
-export function envFilePaths(nodeEnv = process.env.NODE_ENV ?? 'development'): string[] {
-  return [`.env.${nodeEnv}`, '.env'].map((name) => fileURLToPath(new URL(name, repoRoot)));
+export function envProfile(env: NodeJS.ProcessEnv = process.env): string {
+  return env.APP_ENV ?? env.NODE_ENV ?? 'development';
+}
+
+export function envFilePaths(profile = envProfile()): string[] {
+  return [`.env.${profile}`, '.env'].map((name) => fileURLToPath(new URL(name, repoRoot)));
 }

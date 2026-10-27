@@ -68,7 +68,10 @@ npm run dev                  # :3000
 ```
 
 Environment profiles: `.env.example` (development), `.env.test.example` (backend e2e, separate
-database), `.env.staging.example` (staging). The backend loads `.env.${NODE_ENV}`, then `.env`.
+database), `.env.staging.example` (staging). The backend loads `.env.${APP_ENV}`, then `.env`;
+`APP_ENV` defaults to `NODE_ENV`. It is a separate variable because staging must run with
+`NODE_ENV=production`, the only value libraries treat as production. Staging in Docker:
+`docker compose --env-file .env.staging up`.
 
 </details>
 
