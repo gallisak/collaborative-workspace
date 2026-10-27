@@ -88,7 +88,8 @@ database), `.env.staging.example` (staging). The backend loads `.env.${APP_ENV}`
 - **Editor.** Paragraphs, headings, lists, checklists, code blocks, links and images; live cursors
   and presence; works offline and syncs when the connection returns.
 - **Version history.** Automatic and manual versions, preview and restore.
-- **Comments.** Threads on blocks, `@mentions` with notifications.
+- **Comments.** Threads on blocks, `@mentions` with notifications. Everyone who can open a page
+  reads its comments; writing them needs edit access, because the spec makes a Viewer read-only.
 - **Publishing.** Public read-only links or edit links for signed-in users, optionally expiring.
 - **Search** across the pages you can open.
 - **Billing.** Free / Pro / Team plans with limits on members, documents and storage, mock checkout.
