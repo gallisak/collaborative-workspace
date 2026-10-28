@@ -198,7 +198,7 @@ describe('Workspaces (e2e)', () => {
 
       const res = await invite(owner, workspaceId, uniqueEmail(), 'VIEWER').expect(402);
       expect(res.body.message).toBe(
-        'The Free plan allows up to 3 members. Upgrade the plan to add more.',
+        'The Free plan allows up to 3 members, guest editors included. Upgrade the plan to add more.',
       );
       await invite(owner, workspaceId, first, 'EDITOR').expect(201);
     });

@@ -104,6 +104,7 @@ describe('toPublicBlocks', () => {
       render(
         el('image', { src: 'javascript:alert(1)' }),
         el('image', { src: 'data:image/svg+xml,<svg onload=alert(1)>' }),
+        el('image', { src: 'http://cdn.example/mixed-content.png' }),
         el('image', { src: '/relative.png' }),
         el('image', { src: '/api/attachments/x/../../auth/logout' }),
       ),

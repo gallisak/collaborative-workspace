@@ -2,17 +2,17 @@ import { Injectable } from '@nestjs/common';
 import type { WorkspaceRole } from '../../generated/prisma/enums.js';
 import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-work.js';
 
-const pending = (now: Date) => ({ acceptedAt: null, revokedAt: null, expiresAt: { gt: now } });
+export const pendingInvitationWhere = (now: Date) => ({
+  acceptedAt: null,
+  revokedAt: null,
+  expiresAt: { gt: now },
+});
 
 @Injectable()
 export class InvitationsRepository extends PrismaRepository {
-  countPending(workspaceId: string, now: Date, tx: Transaction) {
-    return tx.invitation.count({ where: { workspaceId, ...pending(now) } });
-  }
-
   listPending(workspaceId: string, now: Date) {
     return this.prisma.invitation.findMany({
-      where: { workspaceId, ...pending(now) },
+      where: { workspaceId, ...pendingInvitationWhere(now) },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -52,7 +52,7 @@ export class InvitationsRepository extends PrismaRepository {
 
   async markAccepted(invitationId: string, now: Date, tx: Transaction) {
     const { count } = await tx.invitation.updateMany({
-      where: { id: invitationId, ...pending(now) },
+      where: { id: invitationId, ...pendingInvitationWhere(now) },
       data: { acceptedAt: now },
     });
     return count === 1;

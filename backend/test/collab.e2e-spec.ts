@@ -1,4 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import * as Y from 'yjs';
 import { MailService } from '../src/infra/mail/mail.service.js';
@@ -230,6 +232,18 @@ describe('Collab gateway (e2e)', () => {
     reconnected.doc.getText('body').insert(0, 'after downgrade');
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(await storedText(documentId)).toBe('');
+  });
+
+  it('closes a session when its access token expires', async () => {
+    const { owner, documentId } = await setup();
+    const shortLived = await new JwtService().signAsync(
+      { sub: owner.id, iatMs: Date.now() },
+      { secret: api.get(ConfigService).get<string>('JWT_ACCESS_SECRET'), expiresIn: 1 },
+    );
+    const client = connect(documentId, { cookies: `access_token=${shortLived}` });
+    await client.synced;
+
+    expect(await client.closedWith).toBe(4401);
   });
 
   it('serves the health check', async () => {

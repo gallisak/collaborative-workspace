@@ -68,6 +68,7 @@ test.describe('document editor', () => {
 
     await editor(owner.page).click();
     await owner.page.keyboard.type('Hello from Ann. ');
+    await expect.poll(() => documentText(guest.page)).toContain('Hello from Ann. ');
     await editor(guest.page).click();
     await guest.page.keyboard.press('ControlOrMeta+End');
     await guest.page.keyboard.type('Hi from Bob.');
@@ -158,17 +159,23 @@ test.describe('document editor', () => {
 
   test('renames the page from its title and updates the tree', async ({ browser, baseURL }) => {
     const owner = await openSession(browser, baseURL!, 'Ann Owner');
-    const { url } = await createDocument(owner, baseURL!, 'Draft');
+    const { url, documentId } = await createDocument(owner, baseURL!, 'Draft');
     const { page } = owner;
     await openEditor(page, url);
 
     const title = page.getByRole('main').getByRole('textbox', { name: 'Page title' });
+    const renamed = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        response.url().endsWith(`/api/documents/${documentId}`),
+    );
     await title.fill('Release notes');
     await title.press('Enter');
 
     await expect(page.getByRole('tree', { name: 'Pages' }).getByRole('link')).toHaveText(
       'Release notes',
     );
+    expect((await renamed).ok()).toBe(true);
     await page.reload();
     await expect(title).toHaveValue('Release notes');
     await owner.context.close();

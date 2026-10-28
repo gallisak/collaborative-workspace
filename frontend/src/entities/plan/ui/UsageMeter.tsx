@@ -38,22 +38,25 @@ export function UsageMeter({ label, used, limit, note, format = String }: UsageM
 }
 
 interface SeatsMeterProps {
-  usage: { members: number; pendingInvitations: number };
+  usage: { members: number; guestEditors: number; pendingInvitations: number };
   limit: number | null;
 }
 
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
 export function SeatsMeter({ usage, limit }: SeatsMeterProps) {
-  const pending = usage.pendingInvitations;
+  const { guestEditors, pendingInvitations } = usage;
+  const extras = [
+    guestEditors > 0 && plural(guestEditors, 'guest editor', 'guest editors'),
+    pendingInvitations > 0 &&
+      plural(pendingInvitations, 'pending invitation', 'pending invitations'),
+  ].filter(Boolean);
   return (
     <UsageMeter
       label="Members"
-      used={usage.members + pending}
+      used={usage.members + guestEditors + pendingInvitations}
       limit={limit}
-      note={
-        pending > 0
-          ? `Includes ${pending} pending ${pending === 1 ? 'invitation' : 'invitations'}`
-          : undefined
-      }
+      note={extras.length > 0 ? `Includes ${extras.join(' and ')}` : undefined}
     />
   );
 }

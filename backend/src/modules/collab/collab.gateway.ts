@@ -58,6 +58,9 @@ const toBytes = (data: RawData): Uint8Array =>
       ? new Uint8Array(Buffer.concat(data))
       : new Uint8Array(data);
 
+const earliest = (...dates: (Date | null)[]): Date | null =>
+  dates.reduce<Date | null>((min, date) => (date && (!min || date < min) ? date : min), null);
+
 @Injectable()
 export class CollabGateway
   implements OnApplicationBootstrap, BeforeApplicationShutdown, OnApplicationShutdown
@@ -150,7 +153,15 @@ export class CollabGateway
     try {
       const { documentId, workspaceId, user, canWrite, accessToken, shareToken, linkExpiresAt } =
         await this.authenticate(req);
-      client = { socket, user, canWrite, accessToken, shareToken, clientIds: new Set() };
+      client = {
+        socket,
+        user,
+        canWrite,
+        accessToken,
+        tokenExpiresAt: this.tokens.accessTokenExpiresAt(accessToken),
+        shareToken,
+        clientIds: new Set(),
+      };
       room = await this.rooms.join(documentId, workspaceId, client);
       if (socket.readyState !== socket.OPEN) {
         room.leave(client);
@@ -305,9 +316,10 @@ export class CollabGateway
     }
   }
 
-  private scheduleExpiry(room: Room, client: CollabClient, at: Date | null) {
+  private scheduleExpiry(room: Room, client: CollabClient, linkExpiresAt: Date | null) {
     clearTimeout(client.expiry);
     client.expiry = undefined;
+    const at = earliest(linkExpiresAt, client.tokenExpiresAt);
     if (at) {
       const delay = Math.min(Math.max(0, at.getTime() - Date.now()), MAX_TIMER_MS);
       client.expiry = setTimeout(() => void this.recheckGroup(room, [client]), delay);
@@ -343,8 +355,8 @@ export class CollabGateway
     client: CollabClient,
     resolved: { access: DocumentAccess; linkExpiresAt: Date | null },
   ) {
-    if (await this.tokens.isAccessTokenRevoked(client.accessToken)) {
-      client.socket.close(CloseCode.Unauthorized, 'Session ended');
+    if (!(await this.tokens.isAccessTokenValid(client.accessToken))) {
+      client.socket.close(CloseCode.Unauthorized, 'Session expired or ended');
       return;
     }
     const canWrite = canEdit(resolved.access);

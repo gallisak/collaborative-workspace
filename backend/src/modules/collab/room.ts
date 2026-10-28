@@ -11,6 +11,7 @@ export interface CollabClient {
   user: PresenceUser;
   canWrite: boolean;
   accessToken: string;
+  tokenExpiresAt: Date | null;
   shareToken: string | null;
   clientIds: Set<number>;
   expiry?: NodeJS.Timeout;

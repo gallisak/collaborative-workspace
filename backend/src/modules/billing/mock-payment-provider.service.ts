@@ -1,6 +1,16 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { HttpAdapterHost } from '@nestjs/core';
 import { randomBytes } from 'node:crypto';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { API_PREFIX } from '../../common/api-prefix.js';
 import { durationToSeconds } from '../../common/duration.js';
 import type { Env } from '../../infra/config/env.schema.js';
 import {
@@ -10,10 +20,10 @@ import {
 } from './billing-event.js';
 import { BillingRepository } from './billing.repository.js';
 import { BillingService, isCheckoutOpen } from './billing.service.js';
-import { BillingWebhookService } from './billing-webhook.service.js';
-import { signPayload } from './webhook-signature.js';
+import { SIGNATURE_HEADER, signPayload } from './webhook-signature.js';
 
 const providerId = (prefix: string) => `${prefix}_${randomBytes(12).toString('hex')}`;
+const DELIVERY_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class MockPaymentProvider {
@@ -24,7 +34,7 @@ export class MockPaymentProvider {
   constructor(
     private readonly billing: BillingRepository,
     private readonly checkouts: BillingService,
-    private readonly webhook: BillingWebhookService,
+    private readonly adapterHost: HttpAdapterHost,
     config: ConfigService<Env, true>,
   ) {
     this.secret = config.get('BILLING_WEBHOOK_SECRET', { infer: true });
@@ -60,6 +70,24 @@ export class MockPaymentProvider {
     const payload = JSON.stringify(event);
     const signature = signPayload(this.secret, payload, event.created);
     this.logger.log({ checkoutSessionId: sessionId, eventId: event.id }, 'Mock payment succeeded');
-    await this.webhook.receive(Buffer.from(payload), signature);
+    await this.deliver(payload, signature);
+  }
+
+  private async deliver(payload: string, signature: string) {
+    const server = this.adapterHost.httpAdapter.getHttpServer() as Server;
+    const { port } = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${port}/${API_PREFIX}/billing/webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [SIGNATURE_HEADER]: signature },
+      body: payload,
+      signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+    }).catch((error: unknown) => {
+      this.logger.error({ err: error }, 'Mock webhook delivery failed');
+      return null;
+    });
+    if (!response?.ok) {
+      this.logger.error({ status: response?.status }, 'Mock webhook was not accepted');
+      throw new ServiceUnavailableException('The payment provider could not deliver the webhook');
+    }
   }
 }

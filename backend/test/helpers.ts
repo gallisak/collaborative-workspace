@@ -24,7 +24,7 @@ export async function createTestApp({ overrides = [] }: TestAppOptions = {}) {
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication({ bufferLogs: true, rawBody: true });
   setupApp(app);
-  await app.init();
+  await app.listen(0, '127.0.0.1');
   return { app, prisma: app.get(PrismaService) };
 }
 

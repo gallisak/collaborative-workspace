@@ -68,7 +68,10 @@ npm run dev                  # :3000
 ```
 
 Environment profiles: `.env.example` (development), `.env.test.example` (backend e2e, separate
-database), `.env.staging.example` (staging). The backend loads `.env.${NODE_ENV}`, then `.env`.
+database), `.env.staging.example` (staging). The backend loads `.env.${APP_ENV}`, then `.env`;
+`APP_ENV` defaults to `NODE_ENV`. It is a separate variable because staging must run with
+`NODE_ENV=production`, the only value libraries treat as production. Staging in Docker:
+`docker compose --env-file .env.staging up`.
 
 </details>
 
@@ -85,7 +88,8 @@ database), `.env.staging.example` (staging). The backend loads `.env.${NODE_ENV}
 - **Editor.** Paragraphs, headings, lists, checklists, code blocks, links and images; live cursors
   and presence; works offline and syncs when the connection returns.
 - **Version history.** Automatic and manual versions, preview and restore.
-- **Comments.** Threads on blocks, `@mentions` with notifications.
+- **Comments.** Threads on blocks, `@mentions` with notifications. Everyone who can open a page
+  reads its comments; writing them needs edit access, because the spec makes a Viewer read-only.
 - **Publishing.** Public read-only links or edit links for signed-in users, optionally expiring.
 - **Search** across the pages you can open.
 - **Billing.** Free / Pro / Team plans with limits on members, documents and storage, mock checkout.
@@ -106,6 +110,11 @@ frontend/    Next.js App Router + Feature-Sliced Design
 docker/      container init scripts, nginx ingress config
 ```
 
+- **One backend image, three processes.** The API, the collab gateway and the worker share the
+  modules, the Prisma client and the dependencies, so `backend/Dockerfile` builds one image and
+  compose runs it three times with a different command (`dist/main.js`, `dist/collab.js`,
+  `dist/worker.js`). It is one build, the three can never run different versions of the shared
+  code, and each still scales and restarts on its own.
 - **The collab gateway owns document content.** It keeps the live `Y.Doc` of every open document
   and is its only writer. The API checks access and enqueues work for it (manual versions,
   restores).
@@ -117,7 +126,8 @@ docker/      container init scripts, nginx ingress config
   cookie, without a session store; the WebSocket gateway reads the same cookie. Refresh tokens
   (30 days) rotate on every use, and reusing a rotated one revokes the whole session. A 10 second
   grace window lets two tabs refresh at the same moment without being taken for theft; a token
-  revoked by logout is simply rejected.
+  revoked by logout is simply rejected. The collab gateway closes a WebSocket session (`4401`)
+  when its access token expires or is revoked, and the editor refreshes the session and reconnects.
 
 `frontend/pages/` is intentionally empty, otherwise Next.js would treat the FSD `src/pages` layer
 as the Pages Router.
@@ -150,7 +160,10 @@ built from, only what changes while the user works.
   a failing section shows "Try again" without breaking the others.
 - **Proxy (`proxy.ts`, the Next 16 middleware).** Separates public routes from private ones,
   redirects signed-out users to the login page with a safe `next`, and refreshes an expired access
-  token before rendering.
+  token before rendering. This is the edge middleware of the spec: Next 16 renamed Middleware to
+  Proxy and runs it on the Node.js runtime only (a `runtime` option in `proxy.ts` is an error). It
+  stays light anyway: it reads cookies and calls the API only when the access token is missing or about
+  to expire.
 - **Server Actions vs real-time.** Settings-style mutations go through Server Actions (workspace,
   members, invitations, share links, checkout), each validated with zod. Tree operations call the
   API from the browser for instant feedback. Document content never goes through either: it is a
@@ -246,13 +259,19 @@ a few seconds; access and deletion are always checked at query time.
 | Pro  | 10      | unlimited | 10 GB   |
 | Team | 50      | unlimited | 100 GB  |
 
+A member seat is taken by every member, every pending invitation and every person outside the
+workspace who can edit a page shared with them directly; otherwise sharing pages for editing would
+bypass the member limit. Guests with view access are free, as in Notion and Google Docs. Edit
+links from publishing are not seats: they belong to the page, not to a person, and can be revoked
+or expire at any time.
+
 Exceeding a limit returns `402` with an explanation, and the UI offers the plans.
 
 **Mock Stripe Checkout.**
 
 1. An owner or admin starts a checkout; the API creates a checkout session and returns its page.
-2. Paying builds a `checkout.session.completed` event, signs it with HMAC-SHA256 and delivers it to
-   `POST /api/billing/webhook`, exactly as an external provider would.
+2. Paying builds a `checkout.session.completed` event, signs it with HMAC-SHA256 and sends it over
+   HTTP to `POST /api/billing/webhook`, the same request an external provider would make.
 3. The webhook verifies the signature over the raw body (5 minute tolerance), stores the event by
    its provider id and answers `200` at once; processing runs in the worker.
 4. The worker locks the event, the session and the workspace, re-checks the limits of the new plan
@@ -276,7 +295,7 @@ through short-lived presigned URLs, to anyone only when the page is published.
 - **Validation.** DTOs with class-validator on the backend (unknown fields are rejected), zod on
   the frontend and in Server Actions.
 - **XSS.** User content is sanitized on the server before any server rendering; the editor accepts
-  only web and email links.
+  only web and email links, and public pages show external images only over `https`.
 - **CSRF.** `SameSite` cookies and an `Origin` check on every mutating request with a session.
 - **Rate limits** (Redis): sign-in per email and per IP, share link creation per user, everything
   else per IP. The ingress overwrites `X-Forwarded-For`, so the client address cannot be forged.

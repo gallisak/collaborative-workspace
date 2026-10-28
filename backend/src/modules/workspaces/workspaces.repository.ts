@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { WorkspaceRole } from '../../generated/prisma/enums.js';
 import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-work.js';
 import { activeShareLinkWhere } from '../permissions/document-access.js';
+import { pendingInvitationWhere } from './invitations.repository.js';
+import { guestEditorsWhere } from './plan-limits.js';
 
 @Injectable()
 export class WorkspacesRepository extends PrismaRepository {
@@ -54,6 +56,43 @@ export class WorkspacesRepository extends PrismaRepository {
 
   countMembers(workspaceId: string, tx: Transaction) {
     return tx.workspaceMember.count({ where: { workspaceId } });
+  }
+
+  async countSeats(
+    workspaceId: string,
+    now: Date,
+    tx: Transaction,
+    except: { userId?: string; email?: string } = {},
+  ) {
+    const members = await this.countMembers(workspaceId, tx);
+    const guestEditors = await tx.user.count({
+      where: {
+        ...guestEditorsWhere(workspaceId),
+        NOT: [
+          ...(except.userId ? [{ id: except.userId }] : []),
+          ...(except.email ? [{ email: except.email }] : []),
+        ],
+      },
+    });
+    const invitations = await tx.invitation.count({
+      where: {
+        workspaceId,
+        ...pendingInvitationWhere(now),
+        ...(except.email && { email: { not: except.email } }),
+      },
+    });
+    return members + guestEditors + invitations;
+  }
+
+  holdsSeat(workspaceId: string, userId: string, tx: Transaction) {
+    return tx.user
+      .count({
+        where: {
+          id: userId,
+          OR: [{ memberships: { some: { workspaceId } } }, guestEditorsWhere(workspaceId)],
+        },
+      })
+      .then((count) => count > 0);
   }
 
   listMembers(workspaceId: string) {

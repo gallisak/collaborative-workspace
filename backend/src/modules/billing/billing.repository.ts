@@ -3,6 +3,7 @@ import type { Prisma } from '../../generated/prisma/client.js';
 import type { PlanTier } from '../../generated/prisma/enums.js';
 import { PrismaRepository, type Transaction } from '../../infra/prisma/unit-of-work.js';
 import { ofLiveDocuments } from '../attachments/attachments.repository.js';
+import { guestEditorsWhere } from '../workspaces/plan-limits.js';
 import type { WorkspaceUsage } from './plan-fit.js';
 
 export interface NewBillingEvent {
@@ -31,15 +32,20 @@ export class BillingRepository extends PrismaRepository {
 
   async usage(workspaceId: string, tx?: Transaction): Promise<WorkspaceUsage> {
     const db = this.db(tx);
-    const [members, documents, storage] = await Promise.all([
+    const [members, guestEditors, documents, storage] = await Promise.all([
       db.workspaceMember.count({ where: { workspaceId } }),
+      this.countGuestEditors(workspaceId, tx),
       db.document.count({ where: { workspaceId, deletedAt: null } }),
       db.attachment.aggregate({
         where: { workspaceId, status: 'UPLOADED', ...ofLiveDocuments },
         _sum: { sizeBytes: true },
       }),
     ]);
-    return { members, documents, storageBytes: storage._sum.sizeBytes ?? 0n };
+    return { members, guestEditors, documents, storageBytes: storage._sum.sizeBytes ?? 0n };
+  }
+
+  countGuestEditors(workspaceId: string, tx?: Transaction) {
+    return this.db(tx).user.count({ where: guestEditorsWhere(workspaceId) });
   }
 
   findWorkspace(workspaceId: string, now = new Date()) {
